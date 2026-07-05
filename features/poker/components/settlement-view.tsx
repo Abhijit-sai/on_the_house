@@ -252,7 +252,7 @@ export function SettlementView({ detail }: { detail: GameDetail }) {
         <p className="rounded-2xl border border-red-danger/30 bg-red-danger/10 p-3 text-sm text-red-danger">{error}</p>
       ) : null}
 
-      <div className="sticky bottom-24 z-10 space-y-2">
+      <div className="sticky bottom-20 z-10 -mx-2 space-y-2 rounded-[24px] border border-border bg-background/95 p-3 shadow-[0_-12px_32px_rgba(0,0,0,0.55)] backdrop-blur">
         <Button
           className="h-14 w-full text-base shadow-glow"
           disabled={!allPaid || isPending}

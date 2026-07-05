@@ -189,7 +189,7 @@ export function LiveView({ detail }: { detail: GameDetail }) {
         </Button>
       </div>
 
-      <div className="sticky bottom-24 z-10">
+      <div className="sticky bottom-20 z-10 -mx-2 rounded-[24px] border border-border bg-background/95 p-3 shadow-[0_-12px_32px_rgba(0,0,0,0.55)] backdrop-blur">
         <Button
           className="h-14 w-full text-base shadow-glow"
           size="lg"
