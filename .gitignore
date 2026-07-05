@@ -1,0 +1,14 @@
+.next
+node_modules
+.env
+.env*.local
+dist
+coverage
+*.tsbuildinfo
+
+# clerk configuration (can include secrets)
+/.clerk/
+.next_copied_from_codex_workspace/
+
+# local claude settings
+.claude/settings.local.json
