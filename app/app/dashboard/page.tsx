@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentHost } from "@/features/hosts/queries";
 import { GameCard } from "@/features/poker/components/game-card";
-import { listGamesForCurrentHost } from "@/features/poker/queries";
+import { getHostStats, listGamesForCurrentHost } from "@/features/poker/queries";
+import { formatMoney, formatSignedMoney } from "@/lib/format";
 
 export default async function DashboardPage() {
   const host = await getCurrentHost();
@@ -15,6 +16,8 @@ export default async function DashboardPage() {
   }
 
   const games = await listGamesForCurrentHost();
+  const closedGameIds = games.filter((g) => g.status === "closed").map((g) => g.id);
+  const stats = await getHostStats(closedGameIds);
 
   const liveGames = games.filter((g) => g.status === "live" || g.status === "paused" || g.status === "tally_pending");
   const draftGames = games.filter((g) => g.status === "draft");
@@ -49,11 +52,26 @@ export default async function DashboardPage() {
       <section className="grid grid-cols-2 gap-3">
         <Card>
           <p className="text-xs text-muted">Games hosted</p>
-          <p className="mt-1 text-2xl font-black tabular-nums">{games.filter((g) => g.status === "closed").length}</p>
+          <p className="mt-1 text-2xl font-black tabular-nums">{closedGameIds.length}</p>
         </Card>
         <Card>
           <p className="text-xs text-muted">Pending settlements</p>
           <p className="mt-1 text-2xl font-black tabular-nums">{pendingGames.length}</p>
+        </Card>
+        <Card>
+          <p className="text-xs text-muted">Volume tracked</p>
+          <p className="mt-1 text-2xl font-black tabular-nums">{formatMoney(stats.volumeTracked)}</p>
+        </Card>
+        <Card>
+          <p className="text-xs text-muted">Running hot</p>
+          {stats.biggestWinner ? (
+            <>
+              <p className="mt-1 truncate text-lg font-black">{stats.biggestWinner.name}</p>
+              <p className="text-sm font-bold tabular-nums text-success">{formatSignedMoney(stats.biggestWinner.net)}</p>
+            </>
+          ) : (
+            <p className="mt-1 text-lg font-black text-muted">—</p>
+          )}
         </Card>
       </section>
 

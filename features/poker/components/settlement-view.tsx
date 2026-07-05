@@ -9,9 +9,11 @@ import {
   IndianRupee,
   Loader2,
   PartyPopper,
+  QrCode,
   Smartphone,
   Trophy,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import type { SettlementLine } from "@/db/types/database";
 import { Button } from "@/components/ui/button";
@@ -20,31 +22,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { PlayerAvatar } from "@/components/shared/player-avatar";
+import { QrSheet } from "@/components/shared/qr-sheet";
 import { closeGame, recordLinePayment, reopenTally } from "@/features/poker/actions";
+import { updatePlayerUpi } from "@/features/players/actions";
 import type { GameDetail, SeatedPlayer } from "@/features/poker/queries";
 import { roundMoney } from "@/features/settlement/calculations";
 import { formatMoney, formatSignedMoney } from "@/lib/format";
+import { upiLink } from "@/lib/upi";
 import { cn } from "@/lib/utils";
-
-function upiLink(upiId: string, payeeName: string, amount: number, gameName: string) {
-  const params = new URLSearchParams({
-    pa: upiId,
-    pn: payeeName,
-    am: amount.toFixed(2),
-    cu: "INR",
-    tn: `Game settlement - ${gameName}`,
-  });
-
-  return `upi://pay?${params.toString()}`;
-}
 
 export function SettlementView({ detail }: { detail: GameDetail }) {
   const { game, seats, tallies, batch } = detail;
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [partialLine, setPartialLine] = useState<SettlementLine | null>(null);
   const [partialAmount, setPartialAmount] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
+  const [qrLine, setQrLine] = useState<{ upiUri: string; payeeName: string; amount: number } | null>(null);
+  const [upiEditSeat, setUpiEditSeat] = useState<SeatedPlayer | null>(null);
+  const [upiDraft, setUpiDraft] = useState("");
 
   const seatsById = useMemo(() => new Map(seats.map((seat) => [seat.id, seat])), [seats]);
   const lines = batch?.lines ?? [];
@@ -82,12 +79,15 @@ export function SettlementView({ detail }: { detail: GameDetail }) {
 
   return (
     <div className="space-y-5">
-      <Card className={cn("space-y-1", allPaid ? "border-success/50 shadow-glow" : "bg-gold-tint")}>
+      <Card
+        key={allPaid ? "settled" : "pending"}
+        className={cn("space-y-1", allPaid ? "chip-pop border-success/50 shadow-glow" : "bg-gold-tint")}
+      >
         <p className="text-xs font-semibold uppercase tracking-wider text-muted">
           {allPaid ? "All settled" : "Left to settle"}
         </p>
         <p className={cn("text-3xl font-black tabular-nums", allPaid ? "text-success" : "text-white")}>
-          {allPaid ? "Done!" : formatMoney(pendingTotal)}
+          {allPaid ? "Done! 🎉" : formatMoney(pendingTotal)}
         </p>
         <p className="text-xs text-muted">
           {lines.filter((l) => l.status === "paid").length}/{lines.length} payments completed
@@ -199,6 +199,20 @@ export function SettlementView({ detail }: { detail: GameDetail }) {
                       <Button
                         size="sm"
                         variant="secondary"
+                        onClick={() =>
+                          setQrLine({
+                            upiUri: upiLink(receiverUpi, to.player.name, remaining, game.name),
+                            payeeName: to.player.name,
+                            amount: remaining,
+                          })
+                        }
+                      >
+                        <QrCode className="h-4 w-4" />
+                        QR
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
                         onClick={() => copyText(receiverUpi, `upi-${line.id}`)}
                       >
                         <Copy className="h-4 w-4" />
@@ -206,14 +220,26 @@ export function SettlementView({ detail }: { detail: GameDetail }) {
                       </Button>
                     </>
                   ) : (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => copyText(String(remaining), `amt-${line.id}`)}
-                    >
-                      <Copy className="h-4 w-4" />
-                      {copied === `amt-${line.id}` ? "Copied!" : "Copy amount"}
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => copyText(String(remaining), `amt-${line.id}`)}
+                      >
+                        <Copy className="h-4 w-4" />
+                        {copied === `amt-${line.id}` ? "Copied!" : "Copy amount"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setUpiEditSeat(to);
+                          setUpiDraft("");
+                        }}
+                      >
+                        Add UPI for {to.player.name}
+                      </Button>
+                    </>
                   )}
                 </div>
               ) : null}
@@ -284,6 +310,55 @@ export function SettlementView({ detail }: { detail: GameDetail }) {
               }}
             >
               Save payment
+            </Button>
+          </div>
+        ) : null}
+      </BottomSheet>
+
+      <QrSheet
+        open={qrLine !== null}
+        onClose={() => setQrLine(null)}
+        upiUri={qrLine?.upiUri ?? ""}
+        payeeName={qrLine?.payeeName ?? ""}
+        amount={qrLine?.amount ?? 0}
+      />
+
+      <BottomSheet
+        open={upiEditSeat !== null}
+        onClose={() => setUpiEditSeat(null)}
+        title={`UPI for ${upiEditSeat?.player.name ?? ""}`}
+      >
+        {upiEditSeat ? (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="upi-edit">UPI ID</Label>
+              <Input
+                id="upi-edit"
+                placeholder="name@bank"
+                value={upiDraft}
+                onChange={(e) => setUpiDraft(e.target.value)}
+              />
+              <p className="text-xs text-muted">Saved to their profile — every future settlement gets the shortcut too.</p>
+            </div>
+            <Button
+              className="w-full"
+              disabled={isPending}
+              onClick={() => {
+                const seat = upiEditSeat;
+                setUpiEditSeat(null);
+                startTransition(async () => {
+                  const result = await updatePlayerUpi({ playerId: seat.player.id, upiId: upiDraft });
+
+                  if (!result.ok) {
+                    setError(result.message ?? "Could not save the UPI ID.");
+                    return;
+                  }
+
+                  router.refresh();
+                });
+              }}
+            >
+              Save UPI ID
             </Button>
           </div>
         ) : null}

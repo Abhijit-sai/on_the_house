@@ -1,9 +1,9 @@
 # On the House — Project Summary
 
 ## 1. Current Project State
-The repo contains a working Next.js App Router app for On the House with the complete Poker Night flow implemented end to end for the host: game setup wizard, live buy-in ledger, final chip tally with hard-block validation, settlement generation (direct + host modes, advance-aware), payment tracking, game closure, reopen, and history. Dashboard and history pages query real game data.
+The repo contains a working Next.js App Router app for On the House with all WBS phases 0–8 implemented (minus live-database verification): the complete host Poker Night flow, public read-only player view at `/g/[token]`, UPI conveniences (deep link, QR, copy, add-UPI-during-settlement), and shareable 1080×1920 canvas result cards. Phase 9 is partially done (theme, avatars, motion; no 3D/physics). The settlement engine has a 22-test vitest suite covering all required cases from docs/06.
 
-The app typechecks and builds successfully. Runtime use requires real Clerk and Supabase environment variables plus both migrations applied to Supabase.
+The app typechecks, builds, and tests green. The repo is a git repository (main branch). Runtime use requires real Clerk and Supabase environment variables plus both migrations applied to Supabase — the user has explicitly deferred DB/login setup until the build is ready.
 
 ## 2. Latest Session Summary
 Date: 2026-07-05
@@ -19,10 +19,19 @@ What was completed:
 - Dashboard + history wired to real games.
 - Verified: `npm run typecheck`, `npm run build`, and a node script exercising the settlement engine against the docs examples plus advance edge cases (all passing).
 
+Second pass in the same session (phases 6–9):
+- git init on `main`, repo-local identity, phased commits.
+- Phase 6: `getPublicGameDetail` (token-gated, safe fields only) + `/g/[token]` public view with live/tally/settlement/closed/cancelled states; "share live link" button on the host game screen (Web Share API + clipboard fallback).
+- Phase 7: UPI QR bottom sheet (`qrcode` dep) on host + public settlement rows, add/edit UPI during settlement via `updatePlayerUpi` action, copy-only fallbacks.
+- Phase 8: canvas-rendered 1080×1920 share cards (`lib/share-card.ts`): Winner of the Night, Final Damage Report (standings), Who Pays Whom (settlement); native share with download fallback; no UPI IDs on cards.
+- Tests: vitest + `features/settlement/calculations.test.ts` (22 tests, all 16 required cases from docs/06 §19 plus advance cases). `npm test`.
+- Dashboard: volume tracked + biggest winner stats via `getHostStats`.
+- Phase 9 partial: winner reveal spring animation, all-settled celebration, reduced-motion safe.
+
 What was not completed:
-- Migrations not applied to a live Supabase project; no real env vars.
-- Public read-only player view (`public_token` exists but no route).
-- Share/image cards, seating drag-and-drop (up/down buttons + shuffle instead), buy-in edit (reversal + re-add instead), poker table visual (list cards instead), analytics.
+- Migrations not applied to a live Supabase project; no real env vars (user deferred deliberately).
+- Phase 9 leftovers: 3D poker table, Matter.js chip physics, haptics/sound.
+- Seating drag-and-drop (up/down + shuffle instead), buy-in edit-in-place (reversal + re-add instead), Vercel deployment.
 
 ## 3. Important Product Decisions
 - App is mobile-first web; house-party games platform, not only poker.
@@ -58,15 +67,12 @@ What was not completed:
 - Dashboard: live/draft/pending/recent sections, real counts. History: in-progress + finished lists.
 
 ## 7. Pending Tasks
-- [ ] Add real Clerk + Supabase env vars and apply both migrations.
+- [ ] Add real Clerk + Supabase env vars, apply both migrations, run the full flow end to end (THE gating step).
 - [ ] Generate Supabase TypeScript types to replace hand-authored ones.
-- [ ] Public read-only game view via `public_token` + share link.
-- [ ] Shareable image result cards.
-- [ ] Wire a real test runner (the settlement engine checks currently live in a throwaway script; port to vitest).
+- [ ] Vercel deployment.
 - [ ] Buy-in edit-in-place (currently reverse + re-add).
-- [ ] Drag-and-drop seating; poker-table visual layout; dashboard analytics.
-- [ ] git init + first commit (repo is still not a git repository).
-- [ ] Review npm audit advisories; verify lint setup for Next 16.
+- [ ] Drag-and-drop seating; poker-table visual layout; 3D/physics polish.
+- [ ] Review npm audit advisories (8 reported: 1 low, 3 moderate, 4 high); verify lint setup for Next 16.
 
 ## 8. Known Issues / Bugs
 - End-to-end flows unverified against a live database (no env vars).

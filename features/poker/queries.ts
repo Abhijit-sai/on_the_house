@@ -102,3 +102,56 @@ export async function listGamesForCurrentHost() {
 
   return data;
 }
+
+export type HostStats = {
+  volumeTracked: number;
+  biggestWinner: { name: string; net: number } | null;
+  biggestLoser: { name: string; net: number } | null;
+};
+
+export async function getHostStats(gameIds: string[]): Promise<HostStats> {
+  if (gameIds.length === 0) {
+    return { volumeTracked: 0, biggestWinner: null, biggestLoser: null };
+  }
+
+  const host = await requireCurrentHost();
+  const supabase = createSupabaseAdminClient();
+
+  const [buyInsRes, talliesRes, seatsRes, playersRes] = await Promise.all([
+    supabase.from("poker_buy_ins").select("money_amount").in("game_id", gameIds).is("deleted_at", null),
+    supabase.from("poker_final_tallies").select("game_player_id, net_result_money").in("game_id", gameIds),
+    supabase.from("game_players").select("id, player_id").in("game_id", gameIds),
+    supabase.from("players").select("id, name").eq("host_id", host.id),
+  ]);
+
+  if (buyInsRes.error) throw new Error(buyInsRes.error.message);
+  if (talliesRes.error) throw new Error(talliesRes.error.message);
+  if (seatsRes.error) throw new Error(seatsRes.error.message);
+  if (playersRes.error) throw new Error(playersRes.error.message);
+
+  const volumeTracked = buyInsRes.data.reduce((sum, b) => sum + b.money_amount, 0);
+
+  const playerNameBySeat = new Map(
+    seatsRes.data.map((seat) => [seat.id, playersRes.data.find((p) => p.id === seat.player_id)?.name ?? "Player"]),
+  );
+
+  const lifetimeNetByName = new Map<string, number>();
+
+  for (const tally of talliesRes.data) {
+    const name = playerNameBySeat.get(tally.game_player_id);
+
+    if (!name) continue;
+
+    lifetimeNetByName.set(name, (lifetimeNetByName.get(name) ?? 0) + tally.net_result_money);
+  }
+
+  let biggestWinner: HostStats["biggestWinner"] = null;
+  let biggestLoser: HostStats["biggestLoser"] = null;
+
+  for (const [name, net] of lifetimeNetByName) {
+    if (net > 0 && (!biggestWinner || net > biggestWinner.net)) biggestWinner = { name, net };
+    if (net < 0 && (!biggestLoser || net < biggestLoser.net)) biggestLoser = { name, net };
+  }
+
+  return { volumeTracked, biggestWinner, biggestLoser };
+}

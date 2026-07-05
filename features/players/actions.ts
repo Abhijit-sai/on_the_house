@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { requireCurrentHost } from "@/features/hosts/queries";
 import { avatarKeys, colorKeys, playerSchema } from "@/features/players/schemas";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -74,6 +75,35 @@ export async function savePlayer(input: unknown): Promise<PlayerActionState> {
     if (error) {
       return { ok: false, message: error.code === "23505" ? "This player already exists." : error.message };
     }
+  }
+
+  revalidatePath("/app/players");
+  return { ok: true };
+}
+
+const upiUpdateSchema = z.object({
+  playerId: z.string().uuid(),
+  upiId: z.string().trim().max(120, "UPI ID is too long"),
+});
+
+export async function updatePlayerUpi(input: unknown): Promise<PlayerActionState> {
+  const parsed = upiUpdateSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Check the UPI ID." };
+  }
+
+  const host = await requireCurrentHost();
+  const supabase = createSupabaseAdminClient();
+
+  const { error } = await supabase
+    .from("players")
+    .update({ upi_id: parsed.data.upiId || null })
+    .eq("id", parsed.data.playerId)
+    .eq("host_id", host.id);
+
+  if (error) {
+    return { ok: false, message: error.message };
   }
 
   revalidatePath("/app/players");
