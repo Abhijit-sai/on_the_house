@@ -5,6 +5,9 @@ The repo contains a working Next.js App Router app for On the House with all WBS
 
 The app typechecks, builds, and tests green. The repo is a git repository (main branch). Runtime use requires real Clerk and Supabase environment variables plus both migrations applied to Supabase — the user has explicitly deferred DB/login setup until the build is ready.
 
+## 2a. Rally Session (2026-07-06)
+Rally, the second module, is built and verified E2E against the live database. Adapted from the user's rally-habit-tracker repo: host creates a group challenge (title, rules, date range, members from the shared address book); members participate via public `/r/[token]` link with a pick-yourself identity stored in localStorage; daily check-ins (message-based — proof photos deferred until Supabase Storage is set up); peers approve/reject via majority vote (`features/rally/engine.ts`, 18 tests); host can override any decision; standings rank commitment % then streak. Also shipped: game-mode picker at `/app/games/new` (poker wizard → `/app/games/new/poker`), rallies on the dashboard, and a desktop pass (lg: sidebar shell, wider content, two-column rally room). Migration `202607060003_rally_module.sql` applied to Supabase. App deployed on Vercel via GitHub (Abhijit-sai/on_the_house, auto-deploy on push to main); Clerk runs in dev mode. Rally timezone is hardcoded Asia/Kolkata in `todayISO()`.
+
 ## 2. Latest Session Summary
 Date: 2026-07-05
 Session goal: Build the full Poker Night slice (Phase 2–4) on top of the Phase 0/1 foundation.
