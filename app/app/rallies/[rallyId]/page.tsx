@@ -5,6 +5,7 @@ import { RallyRoom } from "@/features/rally/components/rally-room";
 import { RallyStatusBadge } from "@/features/rally/components/rally-status-badge";
 import { ShareGameLink } from "@/features/poker/components/share-game-link";
 import { getRallyViewForHost } from "@/features/rally/queries";
+import { listPlayersForCurrentHost } from "@/features/players/queries";
 
 export default async function RallyPage({ params }: { params: Promise<{ rallyId: string }> }) {
   const { rallyId } = await params;
@@ -13,6 +14,12 @@ export default async function RallyPage({ params }: { params: Promise<{ rallyId:
   if (!view) {
     notFound();
   }
+
+  const players = await listPlayersForCurrentHost();
+  const memberPlayerIds = new Set(view.members.map((m) => m.playerId));
+  const addablePlayers = players
+    .filter((p) => !memberPlayerIds.has(p.id))
+    .map((p) => ({ id: p.id, name: p.name, colorKey: p.color_key }));
 
   return (
     <div className="space-y-5">
@@ -36,7 +43,7 @@ export default async function RallyPage({ params }: { params: Promise<{ rallyId:
         />
       </div>
       <NudgeButton view={view} />
-      <RallyRoom view={view} />
+      <RallyRoom view={view} addablePlayers={addablePlayers} />
     </div>
   );
 }

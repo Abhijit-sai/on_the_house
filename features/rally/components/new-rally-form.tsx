@@ -21,7 +21,7 @@ const durations = [
   { label: "66 days", days: 66 },
 ];
 
-export function NewRallyForm({ players }: { players: Player[] }) {
+export function NewRallyForm({ players, hostName }: { players: Player[]; hostName?: string }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -39,9 +39,23 @@ export function NewRallyForm({ players }: { players: Player[] }) {
 
   function toggleMember(playerId: string) {
     setError(null);
-    setMemberIds((current) =>
-      current.includes(playerId) ? current.filter((id) => id !== playerId) : current.length < 20 ? [...current, playerId] : current,
-    );
+    setMemberIds((current) => {
+      if (current.includes(playerId)) {
+        setHostPlayerId((h) => (h === playerId ? null : h));
+        return current.filter((id) => id !== playerId);
+      }
+
+      if (current.length >= 20) return current;
+
+      // Auto-crown when the host seats a player carrying their own name.
+      const player = playersById.get(playerId);
+
+      if (hostName && player && player.name.trim().toLowerCase() === hostName.trim().toLowerCase()) {
+        setHostPlayerId((h) => h ?? playerId);
+      }
+
+      return [...current, playerId];
+    });
   }
 
   function quickAddPlayer() {
@@ -215,6 +229,13 @@ export function NewRallyForm({ players }: { players: Player[] }) {
 
       {error ? (
         <p className="rounded-2xl border border-red-danger/30 bg-red-danger/10 p-3 text-sm text-red-danger">{error}</p>
+      ) : null}
+
+      {memberIds.length > 0 && !hostPlayerId ? (
+        <p className="rounded-2xl border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
+          No seat is marked as you — crown yourself above so you can check in and rally too. You can also claim a seat
+          later from the rally room.
+        </p>
       ) : null}
 
       <Button className="h-14 w-full text-base shadow-red-glow" disabled={isPending || memberIds.length === 0} onClick={create}>

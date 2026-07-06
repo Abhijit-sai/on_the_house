@@ -40,7 +40,8 @@ export type CheckInView = {
   yesVotes: number;
   noVotes: number;
   eligibleVoters: number;
-  voterIds: string[];
+  /** voter member id → their vote, so the viewer can see their own choice */
+  votesByVoter: Record<string, boolean>;
 };
 
 export type StandingView = MemberStanding & {
@@ -105,7 +106,7 @@ export function buildRallyView(
       yesVotes: own.filter((v) => v.vote).length,
       noVotes: own.filter((v) => !v.vote).length,
       eligibleVoters,
-      voterIds: own.map((v) => v.voter_member_id),
+      votesByVoter: Object.fromEntries(own.map((v) => [v.voter_member_id, v.vote])),
     };
   };
 

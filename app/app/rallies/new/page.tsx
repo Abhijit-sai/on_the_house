@@ -19,7 +19,7 @@ export default async function NewRallyPage() {
         <h1 className="text-3xl font-black text-white">Rally the crew</h1>
         <p className="text-sm text-muted">Daily check-ins, peer votes, streaks on the line.</p>
       </div>
-      <NewRallyForm players={players} />
+      <NewRallyForm players={players} hostName={host.display_name} />
     </div>
   );
 }

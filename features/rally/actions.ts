@@ -106,6 +106,42 @@ export async function reactivateRally(rallyId: string) {
   return setRallyStatus(rallyId, "active");
 }
 
+export async function addRallyMember(rallyId: string, playerId: string): Promise<RallyActionState> {
+  const host = await requireCurrentHost();
+  const supabase = createSupabaseAdminClient();
+
+  const { data: rally, error: rallyError } = await supabase
+    .from("rallies")
+    .select("*")
+    .eq("id", rallyId)
+    .eq("host_id", host.id)
+    .maybeSingle();
+
+  if (rallyError) return fail(rallyError.message);
+  if (!rally) return fail("Rally not found.");
+  if (rally.status !== "active") return fail("Members can only join an active rally.");
+
+  const today = todayISO();
+
+  if (today > rally.end_date) return fail("This rally has already ended.");
+
+  const joinedOn = today > rally.start_date ? today : rally.start_date;
+
+  const { error } = await supabase.from("rally_members").insert({
+    rally_id: rally.id,
+    player_id: playerId,
+    joined_on: joinedOn,
+  });
+
+  if (error) {
+    return fail(error.code === "23505" ? "They're already in this rally." : error.message);
+  }
+
+  revalidateRally(rally.id, rally.public_token);
+
+  return { ok: true };
+}
+
 export async function claimHostSeat(rallyId: string, memberId: string): Promise<RallyActionState> {
   const host = await requireCurrentHost();
   const supabase = createSupabaseAdminClient();
@@ -258,6 +294,39 @@ export async function submitCheckIn(formData: FormData): Promise<RallyActionStat
       .eq("rally_id", rally.id);
 
     const initialStatus = approvalState(0, 0, Math.max((memberCount ?? 1) - 1, 0));
+
+    // A rejected check-in can be retried with fresh proof: replace it and
+    // restart the vote. Anything else for today blocks a duplicate.
+    const { data: existing } = await supabase
+      .from("rally_check_ins")
+      .select("id, status")
+      .eq("rally_member_id", member.id)
+      .eq("check_in_date", today)
+      .maybeSingle();
+
+    if (existing && existing.status !== "rejected") {
+      return fail("Already checked in today — see you tomorrow!");
+    }
+
+    if (existing) {
+      await supabase.from("rally_votes").delete().eq("check_in_id", existing.id);
+
+      const { error } = await supabase
+        .from("rally_check_ins")
+        .update({
+          message: parsed.data.message || null,
+          proof_image_url: proofImageUrl,
+          status: initialStatus,
+          decided_by_host: false,
+        })
+        .eq("id", existing.id);
+
+      if (error) return fail(error.message);
+
+      revalidateRally(rally.id, rally.public_token);
+
+      return { ok: true };
+    }
 
     const { error } = await supabase.from("rally_check_ins").insert({
       rally_id: rally.id,

@@ -1,18 +1,21 @@
 "use client";
 
-import { CalendarDays, CheckCircle2, Loader2, RotateCcw, XCircle } from "lucide-react";
+import { CalendarDays, CheckCircle2, Loader2, RotateCcw, UserPlus, XCircle } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { PlayerAvatar } from "@/components/shared/player-avatar";
-import { cancelRally, claimHostSeat, completeRally, reactivateRally } from "@/features/rally/actions";
+import { addRallyMember, cancelRally, claimHostSeat, completeRally, reactivateRally } from "@/features/rally/actions";
 import { RallyExperience } from "@/features/rally/components/rally-experience";
 import type { RallyView } from "@/features/rally/view";
 
+type AddablePlayer = { id: string; name: string; colorKey: string | null };
+
 /** Host room = the full member experience for the crowned seat + admin controls. */
-export function RallyRoom({ view }: { view: RallyView }) {
+export function RallyRoom({ view, addablePlayers = [] }: { view: RallyView; addablePlayers?: AddablePlayer[] }) {
   const { rally, members } = view;
+  const [addOpen, setAddOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<"complete" | "cancel" | null>(null);
@@ -81,6 +84,10 @@ export function RallyRoom({ view }: { view: RallyView }) {
 
       {active ? (
         <div className="flex gap-2">
+          <Button variant="secondary" className="flex-1" disabled={isPending} onClick={() => setAddOpen(true)}>
+            <UserPlus className="h-4 w-4" />
+            Add member
+          </Button>
           <Button variant="secondary" className="flex-1" disabled={isPending} onClick={() => setConfirmAction("complete")}>
             <CheckCircle2 className="h-4 w-4 text-success" />
             Complete
@@ -101,6 +108,37 @@ export function RallyRoom({ view }: { view: RallyView }) {
           Reactivate rally
         </Button>
       )}
+
+      <BottomSheet open={addOpen} onClose={() => setAddOpen(false)} title="Add a member mid-rally">
+        <div className="space-y-4">
+          <p className="text-sm text-muted">
+            They join from today — earlier days don't count against them. Manage your player crew on the Players page.
+          </p>
+          {addablePlayers.length === 0 ? (
+            <p className="rounded-2xl border border-border bg-elevated p-3 text-sm text-muted">
+              Everyone in your address book is already rallying. Add a new player on the Players page first.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {addablePlayers.map((player) => (
+                <button
+                  key={player.id}
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => {
+                    setAddOpen(false);
+                    run(() => addRallyMember(rally.id, player.id));
+                  }}
+                  className="flex min-h-11 items-center gap-2 rounded-full border border-border bg-elevated px-3 py-1.5 text-sm font-semibold text-cream disabled:opacity-60"
+                >
+                  <PlayerAvatar name={player.name} colorKey={player.colorKey} size="sm" />
+                  {player.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </BottomSheet>
 
       <BottomSheet
         open={confirmAction !== null}
