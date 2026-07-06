@@ -1,22 +1,34 @@
 "use client";
 
-import { ChevronsUpDown, Flame, Spade } from "lucide-react";
+import { ChevronsUpDown, Flame, Gamepad2, Spade } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
+const WORLD_KEY = "oth-last-world";
+
 const worlds = [
   {
-    href: "/app/dashboard",
-    label: "Game Nights",
-    icon: Spade,
-    accent: "text-gold-brand",
-    matches: (path: string) => !path.startsWith("/app/rallies"),
+    id: "arcade",
+    href: "/app/arcade",
+    label: "Arcade",
+    icon: Gamepad2,
+    accent: "text-cream",
+    matches: (path: string) => path.startsWith("/app/arcade"),
   },
   {
+    id: "poker",
+    href: "/app/dashboard",
+    label: "Poker Night",
+    icon: Spade,
+    accent: "text-gold-brand",
+    matches: (path: string) => path.startsWith("/app/dashboard") || path.startsWith("/app/games"),
+  },
+  {
+    id: "rally",
     href: "/app/rallies",
-    label: "Rallies",
+    label: "Rally",
     icon: Flame,
     accent: "text-red-danger",
     matches: (path: string) => path.startsWith("/app/rallies"),
@@ -26,9 +38,23 @@ const worlds = [
 export function GameSwitcher() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [remembered, setRemembered] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
-  const current = worlds.find((w) => w.matches(pathname)) ?? worlds[0];
+  const pathWorld = worlds.find((w) => w.matches(pathname)) ?? null;
+
+  // On shared pages (Players, History, Settings) keep showing the world the
+  // host was last inside, so they never feel yanked out of it.
+  useEffect(() => {
+    if (pathWorld && pathWorld.id !== "arcade") {
+      window.localStorage.setItem(WORLD_KEY, pathWorld.id);
+      setRemembered(pathWorld.id);
+    } else if (!pathWorld) {
+      setRemembered(window.localStorage.getItem(WORLD_KEY));
+    }
+  }, [pathWorld]);
+
+  const current = pathWorld ?? worlds.find((w) => w.id === remembered) ?? worlds[0];
   const CurrentIcon = current.icon;
 
   useEffect(() => {
@@ -65,7 +91,7 @@ export function GameSwitcher() {
         >
           {worlds.map((world) => {
             const Icon = world.icon;
-            const active = world === current;
+            const active = world.id === current.id;
 
             return (
               <Link
