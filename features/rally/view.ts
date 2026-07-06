@@ -31,6 +31,7 @@ export type CheckInView = {
   colorKey: string | null;
   date: string;
   message: string | null;
+  proofImageUrl: string | null;
   status: RallyCheckInStatus;
   decidedByHost: boolean;
   yesVotes: number;
@@ -93,6 +94,7 @@ export function buildRallyView(
       colorKey: member?.color_key ?? null,
       date: checkIn.check_in_date,
       message: checkIn.message,
+      proofImageUrl: checkIn.proof_image_url,
       status: checkIn.status,
       decidedByHost: checkIn.decided_by_host,
       yesVotes: own.filter((v) => v.vote).length,

@@ -175,8 +175,15 @@ async function recomputeCheckInStatus(
   }
 }
 
-export async function submitCheckIn(input: unknown): Promise<RallyActionState> {
-  const parsed = submitCheckInSchema.safeParse(input);
+const PROOF_BUCKET = "rally-proofs";
+const PROOF_MAX_BYTES = 5 * 1024 * 1024;
+
+export async function submitCheckIn(formData: FormData): Promise<RallyActionState> {
+  const parsed = submitCheckInSchema.safeParse({
+    token: formData.get("token"),
+    memberId: formData.get("memberId"),
+    message: formData.get("message") || undefined,
+  });
 
   if (!parsed.success) {
     return fail(parsed.error.issues[0]?.message ?? "Check your check-in.");
@@ -199,6 +206,25 @@ export async function submitCheckIn(input: unknown): Promise<RallyActionState> {
     if (memberError) return fail(memberError.message);
     if (!member) return fail("Pick who you are first.");
 
+    let proofImageUrl: string | null = null;
+    const proof = formData.get("proof");
+
+    if (proof instanceof File && proof.size > 0) {
+      if (proof.size > PROOF_MAX_BYTES) return fail("Photo is too big — keep it under 5MB.");
+      if (!proof.type.startsWith("image/")) return fail("Proof must be an image.");
+
+      const ext = proof.name.includes(".") ? proof.name.split(".").pop() : "jpg";
+      const path = `${rally.id}/${member.id}/${today}-${nanoid(6)}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(PROOF_BUCKET)
+        .upload(path, proof, { contentType: proof.type });
+
+      if (uploadError) return fail(`Could not upload the photo: ${uploadError.message}`);
+
+      proofImageUrl = supabase.storage.from(PROOF_BUCKET).getPublicUrl(path).data.publicUrl;
+    }
+
     const { count: memberCount } = await supabase
       .from("rally_members")
       .select("*", { count: "exact", head: true })
@@ -211,6 +237,7 @@ export async function submitCheckIn(input: unknown): Promise<RallyActionState> {
       rally_member_id: member.id,
       check_in_date: today,
       message: parsed.data.message || null,
+      proof_image_url: proofImageUrl,
       status: initialStatus,
     });
 

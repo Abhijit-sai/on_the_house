@@ -1,8 +1,8 @@
 "use client";
 
-import { CalendarDays, CheckCircle2, Crown, Flame, Loader2, Send, Trophy, UserRound } from "lucide-react";
+import { CalendarDays, Camera, CheckCircle2, Crown, Flame, Loader2, Send, Trophy, UserRound, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,8 +21,23 @@ export function PublicRallyView({ view }: { view: RallyView }) {
   const [memberId, setMemberId] = useState<string | null>(null);
   const [identityLoaded, setIdentityLoaded] = useState(false);
   const [message, setMessage] = useState("");
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofPreview, setProofPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!proofFile) {
+      setProofPreview(null);
+      return;
+    }
+
+    const url = URL.createObjectURL(proofFile);
+    setProofPreview(url);
+
+    return () => URL.revokeObjectURL(url);
+  }, [proofFile]);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(storageKey);
@@ -55,7 +70,14 @@ export function PublicRallyView({ view }: { view: RallyView }) {
     if (!memberId) return;
 
     startTransition(async () => {
-      const result = await submitCheckIn({ token: rally.public_token, memberId, message: message.trim() || undefined });
+      const formData = new FormData();
+      formData.set("token", rally.public_token);
+      formData.set("memberId", memberId);
+
+      if (message.trim()) formData.set("message", message.trim());
+      if (proofFile) formData.set("proof", proofFile);
+
+      const result = await submitCheckIn(formData);
 
       if (!result.ok) {
         setError(result.message ?? "Could not check in.");
@@ -63,6 +85,7 @@ export function PublicRallyView({ view }: { view: RallyView }) {
       }
 
       setMessage("");
+      setProofFile(null);
       router.refresh();
     });
   }
@@ -164,6 +187,36 @@ export function PublicRallyView({ view }: { view: RallyView }) {
                       }
                     }}
                   />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={(e) => setProofFile(e.target.files?.[0] ?? null)}
+                  />
+                  {proofPreview ? (
+                    <div className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={proofPreview} alt="Proof preview" className="max-h-48 w-full rounded-2xl border border-border object-cover" />
+                      <button
+                        type="button"
+                        aria-label="Remove photo"
+                        className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/70 text-white"
+                        onClick={() => {
+                          setProofFile(null);
+                          if (fileInputRef.current) fileInputRef.current.value = "";
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <Button type="button" variant="secondary" className="w-full" onClick={() => fileInputRef.current?.click()}>
+                      <Camera className="h-4 w-4" />
+                      Add proof photo
+                    </Button>
+                  )}
                   <Button className="h-13 w-full" disabled={isPending} onClick={checkIn}>
                     {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
                     Check in for day {view.dayNumber}

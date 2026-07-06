@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { PublicRallyView } from "@/features/rally/components/public-rally-view";
 import { getRallyViewByToken } from "@/features/rally/queries";
 
@@ -12,5 +13,10 @@ export default async function PublicRallyPage({ params }: { params: Promise<{ to
     notFound();
   }
 
-  return <PublicRallyView view={view} />;
+  return (
+    <>
+      <AutoRefresh intervalMs={15000} />
+      <PublicRallyView view={view} />
+    </>
+  );
 }

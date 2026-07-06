@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { PublicGameView } from "@/features/poker/components/public-game-view";
 import { getPublicGameDetail } from "@/features/poker/public-queries";
 
@@ -12,5 +13,10 @@ export default async function PublicGamePage({ params }: { params: Promise<{ tok
     notFound();
   }
 
-  return <PublicGameView detail={detail} />;
+  return (
+    <>
+      <AutoRefresh intervalMs={15000} />
+      <PublicGameView detail={detail} />
+    </>
+  );
 }

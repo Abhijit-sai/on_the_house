@@ -47,6 +47,18 @@ export function CheckInCard({
         <span className={cn("rounded-full px-3 py-1 text-xs font-bold", chip.className)}>{chip.label}</span>
       </div>
 
+      {checkIn.proofImageUrl ? (
+        <a href={checkIn.proofImageUrl} target="_blank" rel="noreferrer" className="mt-3 block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={checkIn.proofImageUrl}
+            alt={`Proof from ${checkIn.memberName}`}
+            loading="lazy"
+            className="max-h-64 w-full rounded-2xl border border-border object-cover"
+          />
+        </a>
+      ) : null}
+
       {checkIn.message ? <p className="mt-2 text-sm leading-6 text-cream">{checkIn.message}</p> : null}
 
       {canVote ? (
