@@ -17,6 +17,10 @@ export type SettlementMode = "direct" | "host";
 
 export type SettlementLineStatus = "pending" | "partially_paid" | "paid";
 
+export type RallyStatus = "draft" | "active" | "completed" | "cancelled";
+
+export type RallyCheckInStatus = "pending" | "approved" | "rejected";
+
 export type Host = {
   id: string;
   clerk_user_id: string;
@@ -139,6 +143,50 @@ export type SettlementLine = {
   checked_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type Rally = {
+  id: string;
+  host_id: string;
+  title: string;
+  description: string | null;
+  start_date: string;
+  end_date: string;
+  status: RallyStatus;
+  public_token: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RallyMember = {
+  id: string;
+  rally_id: string;
+  player_id: string;
+  is_host_member: boolean;
+  joined_on: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RallyCheckIn = {
+  id: string;
+  rally_id: string;
+  rally_member_id: string;
+  check_in_date: string;
+  message: string | null;
+  proof_image_url: string | null;
+  status: RallyCheckInStatus;
+  decided_by_host: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RallyVote = {
+  id: string;
+  check_in_id: string;
+  voter_member_id: string;
+  vote: boolean;
+  created_at: string;
 };
 
 export type GameEvent = {
@@ -319,6 +367,83 @@ export type Database = {
           },
         ];
       };
+      rallies: {
+        Row: Rally;
+        Insert: Insertable<Rally, "description" | "status">;
+        Update: Partial<Omit<Rally, "id" | "host_id" | "created_at">>;
+        Relationships: [
+          {
+            foreignKeyName: "rallies_host_id_fkey";
+            columns: ["host_id"];
+            isOneToOne: false;
+            referencedRelation: "hosts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      rally_members: {
+        Row: RallyMember;
+        Insert: Insertable<RallyMember, "is_host_member" | "joined_on">;
+        Update: Partial<Omit<RallyMember, "id" | "rally_id" | "player_id" | "created_at">>;
+        Relationships: [
+          {
+            foreignKeyName: "rally_members_rally_id_fkey";
+            columns: ["rally_id"];
+            isOneToOne: false;
+            referencedRelation: "rallies";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "rally_members_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      rally_check_ins: {
+        Row: RallyCheckIn;
+        Insert: Insertable<RallyCheckIn, "message" | "proof_image_url" | "status" | "decided_by_host">;
+        Update: Partial<Omit<RallyCheckIn, "id" | "rally_id" | "rally_member_id" | "created_at">>;
+        Relationships: [
+          {
+            foreignKeyName: "rally_check_ins_rally_id_fkey";
+            columns: ["rally_id"];
+            isOneToOne: false;
+            referencedRelation: "rallies";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "rally_check_ins_rally_member_id_fkey";
+            columns: ["rally_member_id"];
+            isOneToOne: false;
+            referencedRelation: "rally_members";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      rally_votes: {
+        Row: RallyVote;
+        Insert: Omit<RallyVote, "id" | "created_at"> & { id?: string; created_at?: string };
+        Update: Partial<Pick<RallyVote, "vote">>;
+        Relationships: [
+          {
+            foreignKeyName: "rally_votes_check_in_id_fkey";
+            columns: ["check_in_id"];
+            isOneToOne: false;
+            referencedRelation: "rally_check_ins";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "rally_votes_voter_member_id_fkey";
+            columns: ["voter_member_id"];
+            isOneToOne: false;
+            referencedRelation: "rally_members";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       game_events: {
         Row: GameEvent;
         Insert: Omit<GameEvent, "id" | "created_at"> & { id?: string; created_at?: string; event_payload?: Json | null };
@@ -342,6 +467,8 @@ export type Database = {
       buy_in_payment_status: BuyInPaymentStatus;
       settlement_mode: SettlementMode;
       settlement_line_status: SettlementLineStatus;
+      rally_status: RallyStatus;
+      rally_check_in_status: RallyCheckInStatus;
     };
     CompositeTypes: Record<string, never>;
   };

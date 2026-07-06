@@ -54,7 +54,7 @@ export function PublicGameView({ detail }: { detail: PublicGameDetail }) {
   }
 
   return (
-    <div className="mx-auto min-h-dvh w-full max-w-md space-y-5 px-4 pb-10 pt-6 text-cream">
+    <div className="mx-auto min-h-dvh w-full max-w-md space-y-5 px-4 pb-10 pt-6 text-cream lg:max-w-2xl">
       <div className="space-y-2">
         <p className="text-xs uppercase tracking-[0.2em] text-gold-brand">On the House</p>
         <div className="flex items-start justify-between gap-3">
