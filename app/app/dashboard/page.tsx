@@ -6,8 +6,6 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { getCurrentHost } from "@/features/hosts/queries";
 import { GameCard } from "@/features/poker/components/game-card";
 import { getHostStats, listGamesForCurrentHost } from "@/features/poker/queries";
-import { RallyCard } from "@/features/rally/components/rally-card";
-import { listRalliesForCurrentHost } from "@/features/rally/queries";
 import { formatMoney, formatSignedMoney } from "@/lib/format";
 
 export default async function DashboardPage() {
@@ -17,10 +15,9 @@ export default async function DashboardPage() {
     redirect("/app/onboarding");
   }
 
-  const [games, rallies] = await Promise.all([listGamesForCurrentHost(), listRalliesForCurrentHost()]);
+  const games = await listGamesForCurrentHost();
   const closedGameIds = games.filter((g) => g.status === "closed").map((g) => g.id);
   const stats = await getHostStats(closedGameIds);
-  const activeRallies = rallies.filter((r) => r.status === "active");
 
   const liveGames = games.filter((g) => g.status === "live" || g.status === "paused" || g.status === "tally_pending");
   const draftGames = games.filter((g) => g.status === "draft");
@@ -51,17 +48,6 @@ export default async function DashboardPage() {
           </Button>
         </Card>
       </section>
-
-      {activeRallies.length > 0 ? (
-        <section className="space-y-3">
-          <h2 className="font-bold text-white">Rallies in motion</h2>
-          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
-            {activeRallies.map((rally) => (
-              <RallyCard key={rally.id} rally={rally} />
-            ))}
-          </div>
-        </section>
-      ) : null}
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Card>

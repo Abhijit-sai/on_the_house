@@ -106,6 +106,33 @@ export async function reactivateRally(rallyId: string) {
   return setRallyStatus(rallyId, "active");
 }
 
+export async function claimHostSeat(rallyId: string, memberId: string): Promise<RallyActionState> {
+  const host = await requireCurrentHost();
+  const supabase = createSupabaseAdminClient();
+
+  const { data: rally, error: rallyError } = await supabase
+    .from("rallies")
+    .select("*")
+    .eq("id", rallyId)
+    .eq("host_id", host.id)
+    .maybeSingle();
+
+  if (rallyError) return fail(rallyError.message);
+  if (!rally) return fail("Rally not found.");
+
+  const { error: clearError } = await supabase.from("rally_members").update({ is_host_member: false }).eq("rally_id", rally.id);
+
+  if (clearError) return fail(clearError.message);
+
+  const { error } = await supabase.from("rally_members").update({ is_host_member: true }).eq("id", memberId).eq("rally_id", rally.id);
+
+  if (error) return fail(error.message);
+
+  revalidateRally(rally.id, rally.public_token);
+
+  return { ok: true };
+}
+
 export async function hostDecideCheckIn(input: unknown): Promise<RallyActionState> {
   const parsed = hostDecisionSchema.safeParse(input);
 

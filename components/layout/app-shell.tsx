@@ -1,16 +1,8 @@
 import { UserButton } from "@clerk/nextjs";
-import { History, Home, Plus, Settings, Users } from "lucide-react";
-import Link from "next/link";
 import { ReactNode } from "react";
 import { GameSwitcher } from "@/components/layout/game-switcher";
+import { BottomWorldNav, SidebarWorldCta, SidebarWorldNav } from "@/components/layout/world-nav";
 import { getCurrentHost } from "@/features/hosts/queries";
-
-const navItems = [
-  { href: "/app/dashboard", label: "Home", icon: Home },
-  { href: "/app/players", label: "Players", icon: Users },
-  { href: "/app/history", label: "History", icon: History },
-  { href: "/app/settings", label: "Settings", icon: Settings },
-];
 
 export async function AppShell({ children }: { children: ReactNode }) {
   const host = await getCurrentHost();
@@ -26,27 +18,8 @@ export async function AppShell({ children }: { children: ReactNode }) {
         <div className="mb-4 px-3">
           <GameSwitcher />
         </div>
-        <Link
-          href="/app/games/new"
-          className="mb-4 flex min-h-11 items-center gap-2 rounded-2xl bg-gold-brand px-4 text-sm font-bold text-background shadow-glow"
-        >
-          <Plus className="h-4 w-4" />
-          New game night
-        </Link>
-        {navItems.map((item) => {
-          const Icon = item.icon;
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex min-h-11 items-center gap-3 rounded-2xl px-4 text-sm font-semibold text-muted hover:bg-elevated hover:text-cream"
-            >
-              <Icon className="h-5 w-5" />
-              {item.label}
-            </Link>
-          );
-        })}
+        <SidebarWorldCta />
+        <SidebarWorldNav />
         <div className="mt-auto px-3">
           <UserButton />
         </div>
@@ -72,22 +45,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
 
       {/* Mobile bottom nav */}
       <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-border bg-background/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden">
-        <div className="grid grid-cols-4 gap-1">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-2xl text-xs font-semibold text-muted hover:bg-elevated hover:text-cream"
-              >
-                <Icon className="h-5 w-5" />
-                {item.label}
-              </Link>
-            );
-          })}
-        </div>
+        <BottomWorldNav />
       </nav>
     </div>
   );
