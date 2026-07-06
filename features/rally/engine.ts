@@ -88,6 +88,45 @@ export function commitmentPercent(history: DayEntry[]): number {
 
 export type ApprovalState = "pending" | "approved" | "rejected";
 
+export type DayState = "approved" | "pending" | "rejected" | "missed" | "open" | "future";
+
+export type DayCell = { date: string; state: DayState };
+
+/** Every rally day (start → end inclusive), regardless of today. */
+export function allRallyDays(startDate: string, endDate: string): string[] {
+  const days: string[] = [];
+
+  for (let day = startDate; day <= endDate; day = addDays(day, 1)) {
+    days.push(day);
+  }
+
+  return days;
+}
+
+/**
+ * Per-day cells for one member's whole rally window, from their join date on:
+ * check-in status where one exists, `open` for an unsubmitted today,
+ * `missed` for unsubmitted past days, `future` for days not reached yet.
+ */
+export function dayCells(
+  startDate: string,
+  endDate: string,
+  joinedOn: string,
+  today: string,
+  statusByDate: Map<string, ApprovalState>,
+): DayCell[] {
+  return allRallyDays(startDate, endDate)
+    .filter((date) => date >= joinedOn)
+    .map((date) => {
+      const status = statusByDate.get(date);
+
+      if (status) return { date, state: status };
+      if (date > today) return { date, state: "future" };
+      if (date === today) return { date, state: "open" };
+      return { date, state: "missed" };
+    });
+}
+
 /**
  * Peer approval: majority of the other members decides. With no other members
  * (solo rally), check-ins approve themselves.

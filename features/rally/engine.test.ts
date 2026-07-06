@@ -4,6 +4,7 @@ import {
   approvalState,
   calculateStreaks,
   commitmentPercent,
+  dayCells,
   elapsedDays,
   memberHistory,
   rankStandings,
@@ -126,6 +127,37 @@ describe("approval", () => {
 
   it("solo rally auto-approves", () => {
     expect(approvalState(0, 0, 0)).toBe("approved");
+  });
+});
+
+describe("day cells", () => {
+  it("maps the full window: statuses, missed, open today, future", () => {
+    const cells = dayCells(
+      "2026-07-01",
+      "2026-07-05",
+      "2026-07-01",
+      "2026-07-03",
+      new Map([
+        ["2026-07-01", "approved"],
+        ["2026-07-02", "pending"],
+      ]),
+    );
+    expect(cells).toEqual([
+      { date: "2026-07-01", state: "approved" },
+      { date: "2026-07-02", state: "pending" },
+      { date: "2026-07-03", state: "open" },
+      { date: "2026-07-04", state: "future" },
+      { date: "2026-07-05", state: "future" },
+    ]);
+  });
+
+  it("marks unsubmitted past days as missed and starts at the join date", () => {
+    const cells = dayCells("2026-07-01", "2026-07-04", "2026-07-02", "2026-07-04", new Map());
+    expect(cells).toEqual([
+      { date: "2026-07-02", state: "missed" },
+      { date: "2026-07-03", state: "missed" },
+      { date: "2026-07-04", state: "open" },
+    ]);
   });
 });
 

@@ -8,6 +8,7 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { PlayerAvatar } from "@/components/shared/player-avatar";
 import { cancelRally, completeRally, hostDecideCheckIn, reactivateRally } from "@/features/rally/actions";
 import { CheckInCard } from "@/features/rally/components/check-in-card";
+import { DayDotsStrip } from "@/features/rally/components/day-dots";
 import type { RallyView } from "@/features/rally/view";
 import { cn } from "@/lib/utils";
 
@@ -69,8 +70,9 @@ export function RallyRoom({ view }: { view: RallyView }) {
                   {standing.isHostMember ? <Crown className="ml-1.5 inline h-3.5 w-3.5 text-gold-brand" /> : null}
                   {standing.checkedInToday ? <CheckCircle2 className="ml-1.5 inline h-3.5 w-3.5 text-success" /> : null}
                 </p>
-                <p className="text-xs text-muted">
-                  {standing.approvedCheckIns}/{standing.totalCheckIns} approved · best {standing.bestStreak}
+                <p className="flex items-center gap-2 text-xs text-muted">
+                  <DayDotsStrip cells={standing.dayCells} />
+                  {standing.approvedCheckIns}/{standing.totalCheckIns} approved
                 </p>
               </div>
               <div className="text-right">

@@ -5,11 +5,14 @@ import type { Rally, RallyCheckIn, RallyCheckInStatus, RallyMember, RallyVote } 
 import {
   calculateStreaks,
   commitmentPercent,
+  dayCells,
   elapsedDays,
   memberHistory,
   rankStandings,
   todayISO,
   totalRallyDays,
+  type ApprovalState,
+  type DayCell,
   type MemberStanding,
 } from "@/features/rally/engine";
 
@@ -44,6 +47,8 @@ export type StandingView = MemberStanding & {
   colorKey: string | null;
   isHostMember: boolean;
   checkedInToday: boolean;
+  /** Whole rally window from the member's join date: one cell per day. */
+  dayCells: DayCell[];
 };
 
 export type RallyView = {
@@ -139,12 +144,16 @@ export function buildRallyView(
     }),
   ).map((standing) => {
     const member = memberViews.find((m) => m.id === standing.memberId);
+    const statusByDate = new Map<string, ApprovalState>(
+      checkIns.filter((c) => c.rally_member_id === standing.memberId).map((c) => [c.check_in_date, c.status]),
+    );
 
     return {
       ...standing,
       colorKey: member?.colorKey ?? null,
       isHostMember: member?.isHostMember ?? false,
       checkedInToday: member?.checkedInToday ?? false,
+      dayCells: dayCells(rally.start_date, rally.end_date, member?.joinedOn ?? rally.start_date, today, statusByDate),
     };
   });
 

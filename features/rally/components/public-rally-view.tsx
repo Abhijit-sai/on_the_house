@@ -1,6 +1,8 @@
 "use client";
 
+import { motion, useReducedMotion } from "framer-motion";
 import { CalendarDays, Camera, CheckCircle2, Crown, Flame, Loader2, Send, Trophy, UserRound, X } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
@@ -9,17 +11,36 @@ import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/shared/player-avatar";
 import { castVote, submitCheckIn } from "@/features/rally/actions";
 import { CheckInCard } from "@/features/rally/components/check-in-card";
+import { DayDotsGrid, DayDotsStrip } from "@/features/rally/components/day-dots";
 import { RallyStatusBadge } from "@/features/rally/components/rally-status-badge";
 import type { RallyView } from "@/features/rally/view";
 import { cn } from "@/lib/utils";
+
+type VisitedRally = { token: string; title: string };
+
+const VISITED_KEY = "oth-rallies-visited";
+
+function rememberVisit(token: string, title: string): VisitedRally[] {
+  try {
+    const list: VisitedRally[] = JSON.parse(window.localStorage.getItem(VISITED_KEY) ?? "[]");
+    const next = [{ token, title }, ...list.filter((r) => r.token !== token)].slice(0, 8);
+    window.localStorage.setItem(VISITED_KEY, JSON.stringify(next));
+    return next;
+  } catch {
+    return [{ token, title }];
+  }
+}
 
 export function PublicRallyView({ view }: { view: RallyView }) {
   const router = useRouter();
   const { rally, members, standings, todayFeed, recentFeed } = view;
   const storageKey = `oth-rally-member:${rally.public_token}`;
 
+  const reducedMotion = useReducedMotion();
   const [memberId, setMemberId] = useState<string | null>(null);
   const [identityLoaded, setIdentityLoaded] = useState(false);
+  const [visited, setVisited] = useState<VisitedRally[]>([]);
+  const [justCheckedIn, setJustCheckedIn] = useState(false);
   const [message, setMessage] = useState("");
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState<string | null>(null);
@@ -47,7 +68,8 @@ export function PublicRallyView({ view }: { view: RallyView }) {
     }
 
     setIdentityLoaded(true);
-  }, [storageKey, members]);
+    setVisited(rememberVisit(rally.public_token, rally.title));
+  }, [storageKey, members, rally.public_token, rally.title]);
 
   const me = useMemo(() => members.find((m) => m.id === memberId) ?? null, [members, memberId]);
   const myStanding = standings.find((s) => s.memberId === memberId);
@@ -86,6 +108,7 @@ export function PublicRallyView({ view }: { view: RallyView }) {
 
       setMessage("");
       setProofFile(null);
+      setJustCheckedIn(true);
       router.refresh();
     });
   }
@@ -122,6 +145,24 @@ export function PublicRallyView({ view }: { view: RallyView }) {
               ? `Day ${view.dayNumber} of ${view.totalDays}`
               : `Starts ${rally.start_date}`}
         </p>
+        {visited.length > 1 ? (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {visited.map((r) => (
+              <Link
+                key={r.token}
+                href={`/r/${r.token}`}
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs font-semibold",
+                  r.token === rally.public_token
+                    ? "border-gold-brand/60 bg-gold-tint text-gold-brand"
+                    : "border-border bg-elevated text-muted",
+                )}
+              >
+                {r.title}
+              </Link>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {identityLoaded && !me ? (
@@ -150,30 +191,61 @@ export function PublicRallyView({ view }: { view: RallyView }) {
       <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-6">
         <div className="space-y-5">
           {me ? (
-            <Card className={cn("space-y-3", me.checkedInToday ? "border-success/40" : "bg-gold-tint shadow-red-glow")}>
+            <Card className={cn("space-y-4", me.checkedInToday ? "border-success/40 shadow-glow" : "bg-gold-tint shadow-red-glow")}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <PlayerAvatar name={me.name} colorKey={me.colorKey} size="sm" />
-                  <div>
-                    <p className="text-sm font-bold text-white">{me.name}</p>
-                    {myStanding ? (
-                      <p className="text-xs text-muted">
-                        <Flame className="mr-0.5 inline h-3 w-3 text-red-danger" />
-                        {myStanding.currentStreak} streak · {Math.round(myStanding.commitmentPercent)}% committed
-                      </p>
-                    ) : null}
-                  </div>
+                  <p className="text-sm font-bold text-white">{me.name}</p>
                 </div>
                 <button type="button" className="text-xs text-muted underline" onClick={clearIdentity}>
                   Not you?
                 </button>
               </div>
 
+              {myStanding ? (
+                <div className="flex items-center justify-around text-center">
+                  <motion.div
+                    key={`streak-${myStanding.currentStreak}`}
+                    initial={reducedMotion ? false : { scale: 0.6 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 260, damping: 14 }}
+                  >
+                    <p
+                      className={cn(
+                        "text-4xl font-black tabular-nums",
+                        myStanding.currentStreak > 0 ? "text-red-danger" : "text-muted",
+                      )}
+                    >
+                      <Flame className="mb-1 mr-1 inline h-7 w-7" />
+                      {myStanding.currentStreak}
+                    </p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted">streak</p>
+                  </motion.div>
+                  <div>
+                    <p className="text-4xl font-black tabular-nums text-white">{Math.round(myStanding.commitmentPercent)}%</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted">committed</p>
+                  </div>
+                  <div>
+                    <p className="text-4xl font-black tabular-nums text-gold-brand">{myStanding.bestStreak}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted">best</p>
+                  </div>
+                </div>
+              ) : null}
+
+              {myStanding ? <DayDotsGrid cells={myStanding.dayCells} /> : null}
+
               {me.checkedInToday ? (
-                <p className="flex items-center gap-2 text-sm font-semibold text-success">
+                <motion.p
+                  initial={reducedMotion || !justCheckedIn ? false : { scale: 0.7, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: "spring", stiffness: 240, damping: 14 }}
+                  className="flex items-center gap-2 rounded-2xl bg-success/10 px-3 py-2.5 text-sm font-bold text-success"
+                >
                   <CheckCircle2 className="h-5 w-5" />
-                  Checked in for today. See you tomorrow!
-                </p>
+                  {justCheckedIn
+                    ? `Day ${view.dayNumber} locked in! 🔥 The streak lives.`
+                    : "Checked in for today. See you tomorrow!"}
+                </motion.p>
               ) : canCheckInToday ? (
                 <div className="space-y-2">
                   <Input
@@ -251,7 +323,10 @@ export function PublicRallyView({ view }: { view: RallyView }) {
                     {standing.isHostMember ? <Crown className="ml-1.5 inline h-3.5 w-3.5 text-gold-brand" /> : null}
                     {standing.checkedInToday ? <CheckCircle2 className="ml-1.5 inline h-3.5 w-3.5 text-success" /> : null}
                   </p>
-                  <p className="text-xs text-muted">best streak {standing.bestStreak}</p>
+                  <p className="flex items-center gap-2 text-xs text-muted">
+                    <DayDotsStrip cells={standing.dayCells} />
+                    best {standing.bestStreak}
+                  </p>
                 </div>
                 <div className="text-right">
                   <p className="font-black tabular-nums text-white">{Math.round(standing.commitmentPercent)}%</p>
