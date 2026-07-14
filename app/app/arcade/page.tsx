@@ -1,10 +1,8 @@
-import { ArrowRight, Flame, Lock, Spade, VenetianMask, Volleyball } from "lucide-react";
-import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ArcadeCarousel, type ArcadeGame } from "@/features/arcade/arcade-carousel";
 import { getCurrentHost } from "@/features/hosts/queries";
 import { listGamesForCurrentHost } from "@/features/poker/queries";
 import { listRalliesForCurrentHost } from "@/features/rally/queries";
-import { cn } from "@/lib/utils";
 
 export default async function ArcadePage() {
   const host = await getCurrentHost();
@@ -17,141 +15,104 @@ export default async function ArcadePage() {
 
   const liveGames = games.filter((g) => ["live", "paused", "tally_pending"].includes(g.status)).length;
   const pendingGames = games.filter((g) => g.status === "pending_settlement").length;
+  const closedGames = games.filter((g) => g.status === "closed").length;
   const activeRallies = rallies.filter((r) => r.status === "active").length;
 
   const pokerStatus =
     liveGames > 0
       ? `🔴 ${liveGames} table${liveGames === 1 ? "" : "s"} live`
       : pendingGames > 0
-        ? `💸 ${pendingGames} settlement${pendingGames === 1 ? "" : "s"} pending`
-        : games.length > 0
-          ? `${games.filter((g) => g.status === "closed").length} nights hosted`
-          : "Deal your first hand";
+        ? `💸 ${pendingGames} to settle`
+        : closedGames > 0
+          ? `${closedGames} night${closedGames === 1 ? "" : "s"} hosted`
+          : "Deal the first hand";
 
   const rallyStatus =
     activeRallies > 0
-      ? `🔥 ${activeRallies} rall${activeRallies === 1 ? "y" : "ies"} in motion`
-      : rallies.length > 0
+      ? `🔥 ${activeRallies} in motion`
+      : rallies.some((r) => r.status === "completed")
         ? `${rallies.filter((r) => r.status === "completed").length} completed`
         : "Light the first fire";
 
+  const arcadeGames: ArcadeGame[] = [
+    {
+      id: "poker",
+      title: "Poker Night",
+      tagline: "Chips, buy-ins & a clean settle-up.",
+      href: "/app/dashboard",
+      image: "/games/poker.png",
+      icon: "spade",
+      accent: "gold",
+      status: pokerStatus,
+    },
+    {
+      id: "rally",
+      title: "Rally",
+      tagline: "Daily proof. Peer votes. Streaks.",
+      href: "/app/rallies",
+      image: "/games/rally.png",
+      icon: "flame",
+      accent: "red",
+      status: rallyStatus,
+    },
+    {
+      id: "undercover",
+      title: "Undercover",
+      tagline: "One of you has a different word.",
+      href: null,
+      image: "/games/undercover.png",
+      icon: "mask",
+      accent: "red",
+      status: null,
+    },
+    {
+      id: "tambola",
+      title: "Tambola",
+      tagline: "Tickets out, numbers up, pot's alive.",
+      href: null,
+      image: "/games/tambola.png",
+      icon: "ball",
+      accent: "gold",
+      status: null,
+    },
+    {
+      id: "mafia",
+      title: "Mafia",
+      tagline: "The town sleeps. The mafia doesn't.",
+      href: null,
+      image: "/games/mafia.png",
+      icon: "drama",
+      accent: "red",
+      status: null,
+    },
+  ];
+
   return (
-    <div className="space-y-8">
-      <div className="space-y-1 text-center lg:text-left">
-        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-gold-brand">The Arcade</p>
-        <h1 className="text-4xl font-black text-white">Pick your game, {host.display_name.split(" ")[0]}.</h1>
+    <div className="relative min-h-[80dvh]">
+      {/* ambient gaming glow */}
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div className="ambient-drift absolute -left-32 top-0 h-96 w-96 rounded-full bg-red-brand/10 blur-3xl" />
+        <div
+          className="ambient-drift absolute -right-32 bottom-0 h-96 w-96 rounded-full bg-gold-brand/10 blur-3xl"
+          style={{ animationDelay: "-7s" }}
+        />
+      </div>
+
+      <div className="space-y-2 pt-4 text-center lg:pt-10">
+        <p className="text-xs font-bold uppercase tracking-[0.4em] text-gold-brand">The Arcade</p>
+        <h1 className="text-4xl font-black text-white lg:text-5xl">
+          Pick your game, {host.display_name.split(" ")[0]}.
+        </h1>
         <p className="text-sm text-muted">Same crew. Different chaos.</p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <ArcadeCard
-          href="/app/dashboard"
-          icon={<Spade className="h-12 w-12 text-gold-brand" />}
-          title="Poker Night"
-          tagline="Chips. Buy-ins. Zero arguments."
-          description="Run the table live, tally the chips, and settle who pays whom before anyone leaves."
-          status={pokerStatus}
-          className="border-gold-brand/30 shadow-glow hover:border-gold-brand/60"
-          glowClass="from-gold-brand/25"
-        />
-        <ArcadeCard
-          href="/app/rallies"
-          icon={<Flame className="h-12 w-12 text-red-danger" />}
-          title="Rally"
-          tagline="Daily proof. Peer votes. Streaks."
-          description="Challenge the crew — check in every day, judge each other's proof, keep the fire alive."
-          status={rallyStatus}
-          className="border-red-brand/30 shadow-red-glow hover:border-red-brand/60"
-          glowClass="from-red-brand/25"
-        />
-        <ComingSoonCard
-          icon={<VenetianMask className="h-10 w-10" />}
-          title="Undercover"
-          description="One of you has a different word. Bluff, describe, accuse. Coming soon."
-        />
-        <ComingSoonCard
-          icon={<Volleyball className="h-10 w-10" />}
-          title="Tambola"
-          description="Tickets on every phone, host draws the numbers, claims auto-verified. In the pipeline."
-        />
+      <div className="mt-6">
+        <ArcadeCarousel games={arcadeGames} />
       </div>
 
-      <p className="text-center text-xs text-muted">
-        Players, history, and settings are shared across every game — one crew, all the chaos.
+      <p className="mt-4 text-center text-xs text-muted">
+        Hover to pause · Players, history & settings are shared across every game
       </p>
-    </div>
-  );
-}
-
-function ArcadeCard({
-  href,
-  icon,
-  title,
-  tagline,
-  description,
-  status,
-  className,
-  glowClass,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  title: string;
-  tagline: string;
-  description: string;
-  status: string;
-  className?: string;
-  glowClass?: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className={cn(
-        "group relative overflow-hidden rounded-[28px] border bg-elevated p-6 transition duration-200 hover:-translate-y-0.5 active:scale-[0.99]",
-        className,
-      )}
-    >
-      <div
-        className={cn(
-          "pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-gradient-radial blur-2xl transition-opacity",
-          "bg-gradient-to-br to-transparent opacity-60 group-hover:opacity-100",
-          glowClass,
-        )}
-      />
-      <div className="relative space-y-3">
-        {icon}
-        <div>
-          <h2 className="text-2xl font-black text-white">{title}</h2>
-          <p className="text-sm font-bold text-cream/80">{tagline}</p>
-        </div>
-        <p className="text-sm leading-6 text-muted">{description}</p>
-        <div className="flex items-center justify-between pt-1">
-          <span className="rounded-full border border-border bg-background/60 px-3 py-1 text-xs font-bold text-cream">
-            {status}
-          </span>
-          <span className="flex items-center gap-1 text-sm font-bold text-gold-brand transition-transform group-hover:translate-x-0.5">
-            Enter
-            <ArrowRight className="h-4 w-4" />
-          </span>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function ComingSoonCard({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
-  return (
-    <div className="relative overflow-hidden rounded-[28px] border border-dashed border-border p-6 text-muted">
-      <div className="space-y-3 opacity-70">
-        {icon}
-        <div className="flex items-center gap-2">
-          <h2 className="text-2xl font-black">{title}</h2>
-          <span className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-            <Lock className="h-3 w-3" />
-            Soon
-          </span>
-        </div>
-        <p className="text-sm leading-6">{description}</p>
-      </div>
     </div>
   );
 }

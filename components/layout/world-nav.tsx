@@ -19,7 +19,7 @@ function worldCta(pathname: string) {
   }
 
   if (pathname.startsWith("/app/dashboard") || pathname.startsWith("/app/games")) {
-    return { href: "/app/games/new", label: "New game night", className: "bg-gold-brand text-background shadow-glow" };
+    return { href: "/app/games/new/poker", label: "New game night", className: "bg-gold-brand text-background shadow-glow" };
   }
 
   return null;

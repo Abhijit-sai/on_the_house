@@ -81,10 +81,43 @@ select {
   animation: chip-pop 0.3s ease-out;
 }
 
+@keyframes arcade-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.arcade-track {
+  animation: arcade-scroll 45s linear infinite;
+}
+
+.group\/track:hover .arcade-track {
+  animation-play-state: paused;
+}
+
+@keyframes ambient-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(4%, -6%) scale(1.15);
+  }
+}
+
+.ambient-drift {
+  animation: ambient-drift 14s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sheet-up,
   .live-pulse,
-  .chip-pop {
+  .chip-pop,
+  .arcade-track,
+  .ambient-drift {
     animation: none;
   }
 }

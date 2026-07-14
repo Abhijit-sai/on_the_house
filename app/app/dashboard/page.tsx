@@ -41,7 +41,7 @@ export default async function DashboardPage() {
             <CardDescription>Set the table, seat your players, and let the chips fly.</CardDescription>
           </CardHeader>
           <Button asChild className="w-full" size="lg">
-            <Link href="/app/games/new">
+            <Link href="/app/games/new/poker">
               <Plus className="h-5 w-5" />
               Start New Game Night
             </Link>

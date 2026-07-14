@@ -12,3 +12,6 @@ coverage
 
 # local claude settings
 .claude/settings.local.json
+
+# source design assets (copies live in public/games)
+/Assets/
