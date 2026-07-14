@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, CheckCircle2, Loader2, RotateCcw, UserPlus, XCircle } from "lucide-react";
+import { CheckCircle2, Loader2, RotateCcw, UserPlus, XCircle } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -22,7 +22,6 @@ export function RallyRoom({ view, addablePlayers = [] }: { view: RallyView; adda
 
   const active = rally.status === "active";
   const hostSeat = members.find((m) => m.isHostMember) ?? null;
-  const checkedInCount = members.filter((m) => m.checkedInToday).length;
 
   function run(action: () => Promise<{ ok: boolean; message?: string }>) {
     startTransition(async () => {
@@ -34,25 +33,6 @@ export function RallyRoom({ view, addablePlayers = [] }: { view: RallyView; adda
 
   return (
     <div className="space-y-5">
-      <Card className="space-y-1 bg-gold-tint">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted">
-          <CalendarDays className="h-4 w-4" />
-          {view.hasEnded ? "Rally finished" : view.hasStarted ? `Day ${view.dayNumber} of ${view.totalDays}` : `Starts ${rally.start_date}`}
-        </div>
-        <p className="text-3xl font-black tabular-nums text-white">
-          {checkedInCount}/{members.length}
-        </p>
-        <p className="text-xs text-muted">checked in today</p>
-        {view.hasStarted && !view.hasEnded ? (
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-elevated">
-            <div
-              className="h-full rounded-full bg-gold-brand transition-all"
-              style={{ width: `${Math.round((view.dayNumber / view.totalDays) * 100)}%` }}
-            />
-          </div>
-        ) : null}
-      </Card>
-
       {!hostSeat ? (
         <Card className="space-y-3 bg-gold-tint">
           <h2 className="font-bold text-white">Which one is you?</h2>
