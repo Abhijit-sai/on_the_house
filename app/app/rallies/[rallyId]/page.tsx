@@ -4,7 +4,7 @@ import { NudgeButton } from "@/features/rally/components/nudge-button";
 import { RallyRoom } from "@/features/rally/components/rally-room";
 import { RallyStatusBadge } from "@/features/rally/components/rally-status-badge";
 import { ShareGameLink } from "@/features/poker/components/share-game-link";
-import { getRallyViewForHost } from "@/features/rally/queries";
+import { getRallyViewForHost, listPendingJoinRequests } from "@/features/rally/queries";
 import { listPlayersForCurrentHost } from "@/features/players/queries";
 
 export default async function RallyPage({ params }: { params: Promise<{ rallyId: string }> }) {
@@ -15,7 +15,7 @@ export default async function RallyPage({ params }: { params: Promise<{ rallyId:
     notFound();
   }
 
-  const players = await listPlayersForCurrentHost();
+  const [players, joinRequests] = await Promise.all([listPlayersForCurrentHost(), listPendingJoinRequests(rallyId)]);
   const memberPlayerIds = new Set(view.members.map((m) => m.playerId));
   const addablePlayers = players
     .filter((p) => !memberPlayerIds.has(p.id))
@@ -43,7 +43,7 @@ export default async function RallyPage({ params }: { params: Promise<{ rallyId:
         />
       </div>
       <NudgeButton view={view} />
-      <RallyRoom view={view} addablePlayers={addablePlayers} />
+      <RallyRoom view={view} addablePlayers={addablePlayers} joinRequests={joinRequests} />
     </div>
   );
 }

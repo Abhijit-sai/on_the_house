@@ -1,19 +1,36 @@
 "use client";
 
-import { CheckCircle2, Loader2, RotateCcw, UserPlus, XCircle } from "lucide-react";
+import { BadgeCheck, CheckCircle2, Loader2, MailQuestion, RotateCcw, UserPlus, XCircle } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { PlayerAvatar } from "@/components/shared/player-avatar";
-import { addRallyMember, cancelRally, claimHostSeat, completeRally, reactivateRally } from "@/features/rally/actions";
+import type { RallyJoinRequest } from "@/db/types/database";
+import {
+  addRallyMember,
+  approveJoinRequest,
+  cancelRally,
+  claimHostSeat,
+  completeRally,
+  declineJoinRequest,
+  reactivateRally,
+} from "@/features/rally/actions";
 import { RallyExperience } from "@/features/rally/components/rally-experience";
 import type { RallyView } from "@/features/rally/view";
 
 type AddablePlayer = { id: string; name: string; colorKey: string | null };
 
 /** Host room = the full member experience for the crowned seat + admin controls. */
-export function RallyRoom({ view, addablePlayers = [] }: { view: RallyView; addablePlayers?: AddablePlayer[] }) {
+export function RallyRoom({
+  view,
+  addablePlayers = [],
+  joinRequests = [],
+}: {
+  view: RallyView;
+  addablePlayers?: AddablePlayer[];
+  joinRequests?: RallyJoinRequest[];
+}) {
   const { rally, members } = view;
   const [addOpen, setAddOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -33,6 +50,55 @@ export function RallyRoom({ view, addablePlayers = [] }: { view: RallyView; adda
 
   return (
     <div className="space-y-5">
+      {joinRequests.length > 0 ? (
+        <Card className="space-y-3 border-warning/40">
+          <div className="flex items-center gap-2">
+            <MailQuestion className="h-4 w-4 text-warning" />
+            <h2 className="font-bold text-white">
+              Join requests
+              <span className="ml-2 rounded-full bg-warning px-2 py-0.5 text-xs font-black text-background">
+                {joinRequests.length}
+              </span>
+            </h2>
+          </div>
+          <div className="space-y-2">
+            {joinRequests.map((request) => (
+              <div key={request.id} className="rounded-2xl border border-border bg-elevated p-3">
+                <div className="flex items-center gap-3">
+                  <PlayerAvatar name={request.display_name} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold text-white">{request.display_name}</p>
+                    <p className="truncate text-xs text-muted">{request.email}</p>
+                  </div>
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <Button
+                    size="sm"
+                    className="flex-1"
+                    disabled={isPending}
+                    onClick={() => run(() => approveJoinRequest(rally.id, request.id))}
+                  >
+                    <BadgeCheck className="h-4 w-4" />
+                    Let them in
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="flex-1 border-red-danger/40 text-red-danger"
+                    disabled={isPending}
+                    onClick={() => run(() => declineJoinRequest(rally.id, request.id))}
+                  >
+                    <XCircle className="h-4 w-4" />
+                    Decline
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted">Approved members join from today — their streak starts here.</p>
+        </Card>
+      ) : null}
+
       {!hostSeat ? (
         <Card className="space-y-3 bg-gold-tint">
           <h2 className="font-bold text-white">Which one is you?</h2>

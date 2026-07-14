@@ -1,8 +1,11 @@
 "use server";
 
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { nanoid } from "nanoid";
 import { revalidatePath } from "next/cache";
+import { avatarKeys, colorKeys } from "@/features/players/schemas";
 import { requireCurrentHost } from "@/features/hosts/queries";
+import { normalizeName } from "@/lib/utils";
 import { approvalState, todayISO } from "@/features/rally/engine";
 import { castVoteSchema, createRallySchema, hostDecisionSchema, submitCheckInSchema } from "@/features/rally/schemas";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -104,6 +107,180 @@ export async function cancelRally(rallyId: string) {
 
 export async function reactivateRally(rallyId: string) {
   return setRallyStatus(rallyId, "active");
+}
+
+/** Signed-in visitor on the public rally page asks the host for a spot. */
+export async function requestToJoinRally(token: string): Promise<RallyActionState> {
+  try {
+    const { userId } = await auth();
+
+    if (!userId) return fail("Sign in first to request a spot.");
+
+    const { supabase, rally } = await requireRallyByToken(token);
+
+    // Already seated? (their account is linked to a member's player profile)
+    const { data: linked } = await supabase
+      .from("players")
+      .select("id")
+      .eq("linked_clerk_user_id", userId);
+
+    if (linked && linked.length > 0) {
+      const { data: seat } = await supabase
+        .from("rally_members")
+        .select("id")
+        .eq("rally_id", rally.id)
+        .in("player_id", linked.map((p) => p.id))
+        .maybeSingle();
+
+      if (seat) return fail("You're already in this rally.");
+    }
+
+    const user = await currentUser();
+    const email = user?.primaryEmailAddress?.emailAddress ?? user?.emailAddresses?.[0]?.emailAddress ?? "";
+    const displayName = user?.fullName?.trim() || email.split("@")[0] || "New member";
+
+    if (!email) return fail("Your account has no email address.");
+
+    const { error } = await supabase.from("rally_join_requests").insert({
+      rally_id: rally.id,
+      clerk_user_id: userId,
+      email,
+      display_name: displayName,
+    });
+
+    if (error) {
+      return fail(error.code === "23505" ? "You already asked — the host will get to it." : error.message);
+    }
+
+    revalidateRally(rally.id, rally.public_token);
+
+    return { ok: true };
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : "Something went wrong.");
+  }
+}
+
+function randomItem<T>(items: readonly T[]) {
+  return items[Math.floor(Math.random() * items.length)] ?? items[0];
+}
+
+export async function approveJoinRequest(rallyId: string, requestId: string): Promise<RallyActionState> {
+  const host = await requireCurrentHost();
+  const supabase = createSupabaseAdminClient();
+
+  const { data: rally, error: rallyError } = await supabase
+    .from("rallies")
+    .select("*")
+    .eq("id", rallyId)
+    .eq("host_id", host.id)
+    .maybeSingle();
+
+  if (rallyError) return fail(rallyError.message);
+  if (!rally) return fail("Rally not found.");
+
+  const { data: request, error: requestError } = await supabase
+    .from("rally_join_requests")
+    .select("*")
+    .eq("id", requestId)
+    .eq("rally_id", rally.id)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  if (requestError) return fail(requestError.message);
+  if (!request) return fail("Request not found or already handled.");
+
+  // Reuse the player profile already linked to this account, else create one.
+  const { data: existing } = await supabase
+    .from("players")
+    .select("*")
+    .eq("host_id", host.id)
+    .eq("linked_clerk_user_id", request.clerk_user_id)
+    .maybeSingle();
+
+  let playerId = existing?.id ?? null;
+
+  if (!playerId) {
+    const base = request.display_name.trim().slice(0, 70) || "New member";
+    let name = base;
+
+    for (let attempt = 2; attempt <= 5; attempt += 1) {
+      const { data: clash } = await supabase
+        .from("players")
+        .select("id")
+        .eq("host_id", host.id)
+        .eq("name_normalized", normalizeName(name))
+        .limit(1);
+
+      if (!clash || clash.length === 0) break;
+
+      name = `${base} ${attempt}`;
+    }
+
+    const { data: player, error: playerError } = await supabase
+      .from("players")
+      .insert({
+        host_id: host.id,
+        name,
+        name_normalized: normalizeName(name),
+        linked_clerk_user_id: request.clerk_user_id,
+        avatar_key: randomItem(avatarKeys),
+        color_key: randomItem(colorKeys),
+      })
+      .select("*")
+      .single();
+
+    if (playerError) return fail(playerError.message);
+
+    playerId = player.id;
+  }
+
+  const today = todayISO();
+  const joinedOn = today > rally.start_date ? today : rally.start_date;
+
+  const { error: memberError } = await supabase.from("rally_members").insert({
+    rally_id: rally.id,
+    player_id: playerId,
+    joined_on: joinedOn,
+  });
+
+  if (memberError && memberError.code !== "23505") return fail(memberError.message);
+
+  const { error } = await supabase.from("rally_join_requests").update({ status: "approved" }).eq("id", request.id);
+
+  if (error) return fail(error.message);
+
+  revalidateRally(rally.id, rally.public_token);
+  revalidatePath("/app/players");
+
+  return { ok: true };
+}
+
+export async function declineJoinRequest(rallyId: string, requestId: string): Promise<RallyActionState> {
+  const host = await requireCurrentHost();
+  const supabase = createSupabaseAdminClient();
+
+  const { data: rally, error: rallyError } = await supabase
+    .from("rallies")
+    .select("*")
+    .eq("id", rallyId)
+    .eq("host_id", host.id)
+    .maybeSingle();
+
+  if (rallyError) return fail(rallyError.message);
+  if (!rally) return fail("Rally not found.");
+
+  const { error } = await supabase
+    .from("rally_join_requests")
+    .update({ status: "declined" })
+    .eq("id", requestId)
+    .eq("rally_id", rally.id)
+    .eq("status", "pending");
+
+  if (error) return fail(error.message);
+
+  revalidateRally(rally.id, rally.public_token);
+
+  return { ok: true };
 }
 
 export async function addRallyMember(rallyId: string, playerId: string): Promise<RallyActionState> {

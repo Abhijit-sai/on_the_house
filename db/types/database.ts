@@ -21,6 +21,8 @@ export type RallyStatus = "draft" | "active" | "completed" | "cancelled";
 
 export type RallyCheckInStatus = "pending" | "approved" | "rejected";
 
+export type RallyJoinRequestStatus = "pending" | "approved" | "declined";
+
 export type Host = {
   id: string;
   clerk_user_id: string;
@@ -187,6 +189,17 @@ export type RallyVote = {
   voter_member_id: string;
   vote: boolean;
   created_at: string;
+};
+
+export type RallyJoinRequest = {
+  id: string;
+  rally_id: string;
+  clerk_user_id: string;
+  email: string;
+  display_name: string;
+  status: RallyJoinRequestStatus;
+  created_at: string;
+  updated_at: string;
 };
 
 export type GameEvent = {
@@ -444,6 +457,20 @@ export type Database = {
           },
         ];
       };
+      rally_join_requests: {
+        Row: RallyJoinRequest;
+        Insert: Insertable<RallyJoinRequest, "status">;
+        Update: Partial<Omit<RallyJoinRequest, "id" | "rally_id" | "clerk_user_id" | "created_at">>;
+        Relationships: [
+          {
+            foreignKeyName: "rally_join_requests_rally_id_fkey";
+            columns: ["rally_id"];
+            isOneToOne: false;
+            referencedRelation: "rallies";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       game_events: {
         Row: GameEvent;
         Insert: Omit<GameEvent, "id" | "created_at"> & { id?: string; created_at?: string; event_payload?: Json | null };
@@ -469,6 +496,7 @@ export type Database = {
       settlement_line_status: SettlementLineStatus;
       rally_status: RallyStatus;
       rally_check_in_status: RallyCheckInStatus;
+      rally_join_request_status: RallyJoinRequestStatus;
     };
     CompositeTypes: Record<string, never>;
   };

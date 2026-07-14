@@ -77,6 +77,82 @@ export async function getRallyViewByToken(token: string): Promise<RallyView | nu
   return assembleRallyView(supabase, rally);
 }
 
+export type RallyViewerContext = {
+  /** Member seat whose player profile is linked to the signed-in account. */
+  linkedMemberId: string | null;
+  /** The signed-in visitor's join-request state for this rally. */
+  requestStatus: "pending" | "approved" | "declined" | null;
+  /** True when the signed-in visitor is the rally's host. */
+  isHost: boolean;
+};
+
+export async function getRallyViewerContext(token: string, clerkUserId: string | null): Promise<RallyViewerContext> {
+  const none: RallyViewerContext = { linkedMemberId: null, requestStatus: null, isHost: false };
+
+  if (!clerkUserId || !token || token.length > 40) return none;
+
+  const supabase = createSupabaseAdminClient();
+
+  const { data: rally } = await supabase.from("rallies").select("id, host_id").eq("public_token", token).maybeSingle();
+
+  if (!rally) return none;
+
+  const [{ data: host }, { data: linkedPlayers }, { data: request }] = await Promise.all([
+    supabase.from("hosts").select("id").eq("id", rally.host_id).eq("clerk_user_id", clerkUserId).maybeSingle(),
+    supabase.from("players").select("id").eq("linked_clerk_user_id", clerkUserId),
+    supabase
+      .from("rally_join_requests")
+      .select("status")
+      .eq("rally_id", rally.id)
+      .eq("clerk_user_id", clerkUserId)
+      .maybeSingle(),
+  ]);
+
+  let linkedMemberId: string | null = null;
+
+  if (linkedPlayers && linkedPlayers.length > 0) {
+    const { data: seat } = await supabase
+      .from("rally_members")
+      .select("id")
+      .eq("rally_id", rally.id)
+      .in("player_id", linkedPlayers.map((p) => p.id))
+      .maybeSingle();
+
+    linkedMemberId = seat?.id ?? null;
+  }
+
+  return {
+    linkedMemberId,
+    requestStatus: request?.status ?? null,
+    isHost: Boolean(host),
+  };
+}
+
+export async function listPendingJoinRequests(rallyId: string) {
+  const host = await requireCurrentHost();
+  const supabase = createSupabaseAdminClient();
+
+  const { data: rally } = await supabase.from("rallies").select("id").eq("id", rallyId).eq("host_id", host.id).maybeSingle();
+
+  if (!rally) return [];
+
+  const { data, error } = await supabase
+    .from("rally_join_requests")
+    .select("*")
+    .eq("rally_id", rally.id)
+    .eq("status", "pending")
+    .order("created_at");
+
+  if (error) {
+    // Tolerate the table not existing yet (migration not applied) — the
+    // host room simply shows no requests instead of crashing.
+    console.warn("rally_join_requests unavailable:", error.message);
+    return [];
+  }
+
+  return data;
+}
+
 export async function listRalliesForCurrentHost() {
   const host = await requireCurrentHost();
   const supabase = createSupabaseAdminClient();
