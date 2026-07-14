@@ -27,8 +27,12 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html lang="en" className="dark">
-        <body className={`${geist.variable} font-sans antialiased`}>{children}</body>
+      {/* suppressHydrationWarning: browser extensions (Grammarly, Scribe, …) inject
+          attributes on <html>/<body> before React hydrates; only these two nodes are exempt. */}
+      <html lang="en" className="dark" suppressHydrationWarning>
+        <body className={`${geist.variable} font-sans antialiased`} suppressHydrationWarning>
+          {children}
+        </body>
       </html>
     </ClerkProvider>
   );
