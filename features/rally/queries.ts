@@ -17,7 +17,7 @@ export async function assembleRallyView(supabase: Supabase, rally: Rally): Promi
   const playerIds = membersRes.data.map((m: RallyMember) => m.player_id);
   const { data: players, error: playersError } = await supabase
     .from("players")
-    .select("id, name, avatar_key, color_key")
+    .select("id, name, avatar_key, color_key, linked_clerk_user_id")
     .in("id", playerIds.length > 0 ? playerIds : ["00000000-0000-0000-0000-000000000000"]);
 
   if (playersError) throw new Error(playersError.message);
@@ -41,6 +41,7 @@ export async function assembleRallyView(supabase: Supabase, rally: Rally): Promi
       name: player?.name ?? "Member",
       avatar_key: player?.avatar_key ?? null,
       color_key: player?.color_key ?? null,
+      linked_clerk_user_id: player?.linked_clerk_user_id ?? null,
     };
   });
 

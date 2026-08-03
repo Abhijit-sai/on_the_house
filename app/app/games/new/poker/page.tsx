@@ -18,7 +18,7 @@ export default async function NewPokerGamePage() {
         <p className="text-sm font-semibold text-gold-brand">Poker Night</p>
         <h1 className="text-3xl font-black text-white">Set the table</h1>
       </div>
-      <NewGameWizard players={players} />
+      <NewGameWizard players={players} hostName={host.display_name} />
     </div>
   );
 }

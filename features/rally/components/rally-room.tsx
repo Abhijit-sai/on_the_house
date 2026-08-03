@@ -33,12 +33,14 @@ export function RallyRoom({
 }) {
   const { rally, members } = view;
   const [addOpen, setAddOpen] = useState(false);
+  const [claimRequestId, setClaimRequestId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<"complete" | "cancel" | null>(null);
 
   const active = rally.status === "active";
   const hostSeat = members.find((m) => m.isHostMember) ?? null;
+  const unclaimedMembers = members.filter((m) => !m.isHostMember && !m.claimed);
 
   function run(action: () => Promise<{ ok: boolean; message?: string }>) {
     startTransition(async () => {
@@ -92,6 +94,15 @@ export function RallyRoom({
                     Decline
                   </Button>
                 </div>
+                {unclaimedMembers.length > 0 ? (
+                  <button
+                    type="button"
+                    className="mt-2 w-full text-xs text-muted underline"
+                    onClick={() => setClaimRequestId(request.id)}
+                  >
+                    Already on the list? Hand them an existing seat
+                  </button>
+                ) : null}
               </div>
             ))}
           </div>
@@ -122,7 +133,7 @@ export function RallyRoom({
         </Card>
       ) : null}
 
-      <RallyExperience view={view} fixedMemberId={hostSeat?.id ?? null} hostControls />
+      <RallyExperience view={view} myMemberId={hostSeat?.id ?? null} hostControls />
 
       {error ? (
         <p className="rounded-2xl border border-red-danger/30 bg-red-danger/10 p-3 text-sm text-red-danger">{error}</p>
@@ -154,6 +165,33 @@ export function RallyRoom({
           Reactivate rally
         </Button>
       )}
+
+      <BottomSheet open={claimRequestId !== null} onClose={() => setClaimRequestId(null)} title="Which seat is theirs?">
+        <div className="space-y-4">
+          <p className="text-sm text-muted">
+            Hand them a seat you already created — they keep its streak and history, and the seat becomes theirs to
+            check in from.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {unclaimedMembers.map((member) => (
+              <button
+                key={member.id}
+                type="button"
+                disabled={isPending}
+                onClick={() => {
+                  const requestId = claimRequestId;
+                  setClaimRequestId(null);
+                  if (requestId) run(() => approveJoinRequest(rally.id, requestId, member.id));
+                }}
+                className="flex min-h-11 items-center gap-2 rounded-full border border-border bg-elevated px-3 py-1.5 text-sm font-semibold text-cream disabled:opacity-60"
+              >
+                <PlayerAvatar name={member.name} colorKey={member.colorKey} size="sm" />
+                {member.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      </BottomSheet>
 
       <BottomSheet open={addOpen} onClose={() => setAddOpen(false)} title="Add a member mid-rally">
         <div className="space-y-4">

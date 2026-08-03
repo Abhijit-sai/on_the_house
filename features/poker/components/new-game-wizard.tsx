@@ -23,7 +23,7 @@ type Seat = {
 
 const steps = ["Rules", "Table", "Review"] as const;
 
-export function NewGameWizard({ players }: { players: Player[] }) {
+export function NewGameWizard({ players, hostName }: { players: Player[]; hostName?: string }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [step, setStep] = useState(0);
@@ -61,7 +61,16 @@ export function NewGameWizard({ players }: { players: Player[] }) {
 
       if (current.length >= 9) return current;
 
-      return [...current, { playerId, isHostPlayer: false, advanceMoney: "" }];
+      // Auto-crown the player carrying the host's own name, so the seat is
+      // never silently missed (it gates host settlement and advances).
+      const player = playersById.get(playerId);
+      const isMe =
+        Boolean(hostName) &&
+        Boolean(player) &&
+        player!.name.trim().toLowerCase() === hostName!.trim().toLowerCase() &&
+        !current.some((seat) => seat.isHostPlayer);
+
+      return [...current, { playerId, isHostPlayer: isMe, advanceMoney: "" }];
     });
   }
 
@@ -477,6 +486,13 @@ export function NewGameWizard({ players }: { players: Player[] }) {
 
       {error ? (
         <p className="rounded-2xl border border-red-danger/30 bg-red-danger/10 p-3 text-sm text-red-danger">{error}</p>
+      ) : null}
+
+      {seats.length > 0 && !seats.some((seat) => seat.isHostPlayer) ? (
+        <p className="rounded-2xl border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
+          No seat is marked as you — tap the crown on your own seat. Without it you can't record advances or settle
+          through yourself as the bank. You can also claim your seat later.
+        </p>
       ) : null}
 
       <div className="flex gap-3">

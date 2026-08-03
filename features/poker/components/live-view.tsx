@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { PlayerAvatar } from "@/components/shared/player-avatar";
 import { addBuyIn, endGame, pauseGame, removeBuyIn, resumeGame, setAdvance } from "@/features/poker/actions";
+import { ClaimSeatCard } from "@/features/poker/components/claim-seat-card";
 import { buyInPresets, seatBuyIns, seatTotals, tableTotals } from "@/features/poker/derive";
 import type { GameDetail } from "@/features/poker/queries";
 import { moneyToCoins } from "@/features/settlement/calculations";
@@ -131,6 +132,8 @@ export function LiveView({ detail }: { detail: GameDetail }) {
           Game paused — resume to keep dealing buy-ins.
         </p>
       ) : null}
+
+      <ClaimSeatCard gameId={game.id} seats={seats} />
 
       <div className="space-y-2">
         {seats.map((seat) => {

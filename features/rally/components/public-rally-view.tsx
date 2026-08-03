@@ -1,6 +1,6 @@
 "use client";
 
-import { BadgeCheck, CalendarDays, Clock, Flame, Loader2, LogIn, Send, ThumbsUp, Users, XCircle } from "lucide-react";
+import { BadgeCheck, CalendarDays, Clock, Flame, Loader2, LogIn, Send, ThumbsUp, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
@@ -42,20 +42,15 @@ export function PublicRallyView({
   const router = useRouter();
   const { rally } = view;
   const [visited, setVisited] = useState<VisitedRally[]>([]);
-  const [storedIdentity, setStoredIdentity] = useState<boolean | null>(null);
-  const [crewMode, setCrewMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     setVisited(rememberVisit(rally.public_token, rally.title));
+  }, [rally.public_token, rally.title]);
 
-    const stored = window.localStorage.getItem(`oth-rally-member:${rally.public_token}`);
-    setStoredIdentity(Boolean(stored && view.members.some((m) => m.id === stored)));
-  }, [rally.public_token, rally.title, view.members]);
-
-  const identityKnown = Boolean(linkedMemberId) || storedIdentity === true;
-  const showInvitation = storedIdentity !== null && !identityKnown && !crewMode;
+  const isMember = Boolean(linkedMemberId);
+  const showInvitation = !isMember;
 
   function requestJoin() {
     startTransition(async () => {
@@ -88,7 +83,7 @@ export function PublicRallyView({
               : `Starts ${rally.start_date}`}
           <span>· {view.members.length} members</span>
         </p>
-        {!showInvitation && visited.length > 1 ? (
+        {isMember && visited.length > 1 ? (
           <div className="flex flex-wrap gap-2 pt-1">
             {visited.map((r) => (
               <Link
@@ -166,20 +161,10 @@ export function PublicRallyView({
             ) : null}
           </Card>
 
-          <button
-            type="button"
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-elevated px-4 py-3 text-sm font-semibold text-muted"
-            onClick={() => setCrewMode(true)}
-          >
-            <Users className="h-4 w-4" />
-            Already part of the crew? Pick your seat
-          </button>
         </div>
       ) : null}
 
-      {!showInvitation && storedIdentity !== null ? (
-        <RallyExperience view={view} fixedMemberId={linkedMemberId ?? undefined} />
-      ) : null}
+      {isMember ? <RallyExperience view={view} myMemberId={linkedMemberId} /> : null}
 
       <p className="pt-2 text-center text-xs text-muted">rallying on the house · house party games</p>
     </div>

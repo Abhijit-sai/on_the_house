@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { CalendarDays, Camera, CheckCircle2, Crown, Flame, Loader2, Send, Trophy, UserRound, X } from "lucide-react";
+import { CalendarDays, Camera, CheckCircle2, Crown, Flame, Loader2, Send, Trophy, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
@@ -25,22 +25,19 @@ type Tab = "today" | "standings" | "calendar";
  */
 export function RallyExperience({
   view,
-  fixedMemberId,
+  myMemberId = null,
   hostControls = false,
 }: {
   view: RallyView;
-  fixedMemberId?: string | null;
+  /** Seat resolved from the signed-in account on the server. Null = spectator. */
+  myMemberId?: string | null;
   hostControls?: boolean;
 }) {
   const router = useRouter();
   const { rally, members, standings, todayFeed, recentFeed } = view;
-  const storageKey = `oth-rally-member:${rally.public_token}`;
-  const usePicker = fixedMemberId === undefined;
 
   const reducedMotion = useReducedMotion();
   const [tab, setTab] = useState<Tab>("today");
-  const [pickedMemberId, setPickedMemberId] = useState<string | null>(null);
-  const [identityLoaded, setIdentityLoaded] = useState(!usePicker);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [proofFile, setProofFile] = useState<File | null>(null);
@@ -50,19 +47,7 @@ export function RallyExperience({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const memberId = usePicker ? pickedMemberId : fixedMemberId;
-
-  useEffect(() => {
-    if (!usePicker) return;
-
-    const stored = window.localStorage.getItem(storageKey);
-
-    if (stored && members.some((m) => m.id === stored)) {
-      setPickedMemberId(stored);
-    }
-
-    setIdentityLoaded(true);
-  }, [usePicker, storageKey, members]);
+  const memberId = myMemberId;
 
   useEffect(() => {
     if (!proofFile) {
@@ -83,25 +68,12 @@ export function RallyExperience({
   const checkedInCount = members.filter((m) => m.checkedInToday).length;
   const pendingApprovals = todayFeed.filter((c) => c.status === "pending").length + recentFeed.filter((c) => c.status === "pending").length;
 
-  function pickIdentity(id: string) {
-    window.localStorage.setItem(storageKey, id);
-    setPickedMemberId(id);
-    setError(null);
-  }
-
-  function clearIdentity() {
-    window.localStorage.removeItem(storageKey);
-    setPickedMemberId(null);
-    setError(null);
-  }
-
   function checkIn() {
     if (!memberId) return;
 
     startTransition(async () => {
       const formData = new FormData();
       formData.set("token", rally.public_token);
-      formData.set("memberId", memberId);
 
       if (message.trim()) formData.set("message", message.trim());
       if (proofFile) formData.set("proof", proofFile);
@@ -125,7 +97,7 @@ export function RallyExperience({
     if (!memberId) return;
 
     startTransition(async () => {
-      const result = await castVote({ token: rally.public_token, voterMemberId: memberId, checkInId, vote: value });
+      const result = await castVote({ token: rally.public_token, checkInId, vote: value });
 
       if (!result.ok) {
         setError(result.message ?? "Could not vote.");
@@ -157,30 +129,6 @@ export function RallyExperience({
 
   return (
     <div className="space-y-4">
-      {/* identity picker (public room, first visit) */}
-      {identityLoaded && usePicker && !me ? (
-        <Card className="space-y-3">
-          <div className="flex items-center gap-2">
-            <UserRound className="h-4 w-4 text-gold-brand" />
-            <h2 className="font-bold text-white">Who are you?</h2>
-          </div>
-          <p className="text-xs text-muted">Pick yourself once — this device remembers.</p>
-          <div className="flex flex-wrap gap-2">
-            {members.map((member) => (
-              <button
-                key={member.id}
-                type="button"
-                onClick={() => pickIdentity(member.id)}
-                className="flex min-h-11 items-center gap-2 rounded-full border border-border bg-elevated px-3 py-1.5 text-sm font-semibold text-cream"
-              >
-                <PlayerAvatar name={member.name} colorKey={member.colorKey} size="sm" />
-                {member.name}
-              </button>
-            ))}
-          </div>
-        </Card>
-      ) : null}
-
       {/* compact hero: me + streak + THE action */}
       {me ? (
         <Card className={cn("space-y-3", me.checkedInToday ? "border-success/40" : "bg-gold-tint shadow-red-glow")}>
@@ -212,11 +160,6 @@ export function RallyExperience({
                   <p className="text-[10px] font-bold uppercase text-muted">committed</p>
                 </div>
               </div>
-            ) : null}
-            {usePicker ? (
-              <button type="button" aria-label="Switch member" className="shrink-0 text-xs text-muted underline" onClick={clearIdentity}>
-                Not you?
-              </button>
             ) : null}
           </div>
 

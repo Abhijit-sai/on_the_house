@@ -196,6 +196,49 @@ export async function reopenGame(gameId: string): Promise<GameActionState> {
   return transitionGame(gameId, ["closed"], { status: "pending_settlement", closed_at: null }, "game_reopened");
 }
 
+/** Mark which seat is the host's own — enables host settlement and advances. */
+export async function claimPokerSeat(gameId: string, gamePlayerId: string): Promise<GameActionState> {
+  try {
+    const { host, supabase, game } = await requireOwnedGame(gameId, [
+      "draft",
+      "live",
+      "paused",
+      "tally_pending",
+    ]);
+
+    const { data: seat } = await supabase
+      .from("game_players")
+      .select("id")
+      .eq("id", gamePlayerId)
+      .eq("game_id", game.id)
+      .maybeSingle();
+
+    if (!seat) return fail("That seat is not in this game.");
+
+    const { error: clearError } = await supabase
+      .from("game_players")
+      .update({ is_host_player: false })
+      .eq("game_id", game.id);
+
+    if (clearError) return fail(clearError.message);
+
+    const { error } = await supabase
+      .from("game_players")
+      .update({ is_host_player: true })
+      .eq("id", gamePlayerId)
+      .eq("game_id", game.id);
+
+    if (error) return fail(error.message);
+
+    await logEvent(supabase, game.id, host.id, "host_seat_claimed", { gamePlayerId });
+    revalidateGame(game.id);
+
+    return { ok: true };
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : "Something went wrong.");
+  }
+}
+
 export async function addBuyIn(input: unknown): Promise<GameActionState> {
   const parsed = addBuyInSchema.safeParse(input);
 
@@ -213,6 +256,16 @@ export async function addBuyIn(input: unknown): Promise<GameActionState> {
       .single();
 
     if (configError) return fail(configError.message);
+
+    // The seat must belong to this game — never trust a client-supplied id.
+    const { data: seat } = await supabase
+      .from("game_players")
+      .select("id")
+      .eq("id", parsed.data.gamePlayerId)
+      .eq("game_id", game.id)
+      .maybeSingle();
+
+    if (!seat) return fail("That player is not seated at this table.");
 
     const moneyAmount = roundMoney(parsed.data.moneyAmount);
     const exactCoins = (moneyAmount * config.ratio_coin_amount) / config.ratio_money_amount;

@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/shared/player-avatar";
 import { backToLive, submitFinalTally } from "@/features/poker/actions";
+import { ClaimSeatCard } from "@/features/poker/components/claim-seat-card";
 import { seatTotals, tableTotals } from "@/features/poker/derive";
 import type { GameDetail } from "@/features/poker/queries";
 import { validateFinalTally } from "@/features/settlement/calculations";
@@ -123,6 +124,8 @@ export function TallyView({ detail }: { detail: GameDetail }) {
           );
         })}
       </div>
+
+      <ClaimSeatCard gameId={game.id} seats={seats} />
 
       <Card className="space-y-3">
         <h2 className="font-bold text-white">How should everyone settle?</h2>

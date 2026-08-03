@@ -36,15 +36,15 @@ export const createRallySchema = z
 
 export type CreateRallyInput = z.infer<typeof createRallySchema>;
 
+// Identity is never client-supplied: the server resolves the acting member
+// from the signed-in account, so nobody can act as someone else.
 export const submitCheckInSchema = z.object({
   token: z.string().min(6).max(40),
-  memberId: z.string().uuid(),
   message: z.string().trim().max(400, "Keep it under 400 characters").optional(),
 });
 
 export const castVoteSchema = z.object({
   token: z.string().min(6).max(40),
-  voterMemberId: z.string().uuid(),
   checkInId: z.string().uuid(),
   vote: z.boolean(),
 });

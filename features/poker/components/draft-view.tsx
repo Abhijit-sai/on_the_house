@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { PlayerAvatar } from "@/components/shared/player-avatar";
 import { cancelGame, startGame } from "@/features/poker/actions";
+import { ClaimSeatCard } from "@/features/poker/components/claim-seat-card";
 import type { GameDetail } from "@/features/poker/queries";
 import { formatMoney } from "@/lib/format";
 
@@ -26,6 +27,8 @@ export function DraftView({ detail }: { detail: GameDetail }) {
 
   return (
     <div className="space-y-5">
+      <ClaimSeatCard gameId={game.id} seats={seats} />
+
       <Card className="space-y-3">
         <h2 className="font-bold text-white">Table lineup</h2>
         <div className="space-y-2">

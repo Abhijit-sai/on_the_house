@@ -164,7 +164,16 @@ function randomItem<T>(items: readonly T[]) {
   return items[Math.floor(Math.random() * items.length)] ?? items[0];
 }
 
-export async function approveJoinRequest(rallyId: string, requestId: string): Promise<RallyActionState> {
+/**
+ * Approve a join request. Pass `claimMemberId` to hand the requester an
+ * existing seat (they claim that profile and keep its history); otherwise a
+ * fresh linked player is created and seated from today.
+ */
+export async function approveJoinRequest(
+  rallyId: string,
+  requestId: string,
+  claimMemberId?: string,
+): Promise<RallyActionState> {
   const host = await requireCurrentHost();
   const supabase = createSupabaseAdminClient();
 
@@ -188,6 +197,49 @@ export async function approveJoinRequest(rallyId: string, requestId: string): Pr
 
   if (requestError) return fail(requestError.message);
   if (!request) return fail("Request not found or already handled.");
+
+  // Claiming an existing seat: link that member's player to the requester's
+  // account. Their streak and history carry over untouched.
+  if (claimMemberId) {
+    const { data: seat } = await supabase
+      .from("rally_members")
+      .select("player_id")
+      .eq("id", claimMemberId)
+      .eq("rally_id", rally.id)
+      .maybeSingle();
+
+    if (!seat) return fail("That member is not in this rally.");
+
+    const { data: seatPlayer } = await supabase
+      .from("players")
+      .select("linked_clerk_user_id")
+      .eq("id", seat.player_id)
+      .maybeSingle();
+
+    if (seatPlayer?.linked_clerk_user_id && seatPlayer.linked_clerk_user_id !== request.clerk_user_id) {
+      return fail("That member is already claimed by another account.");
+    }
+
+    const { error: linkError } = await supabase
+      .from("players")
+      .update({ linked_clerk_user_id: request.clerk_user_id })
+      .eq("id", seat.player_id)
+      .eq("host_id", host.id);
+
+    if (linkError) return fail(linkError.message);
+
+    const { error: statusError } = await supabase
+      .from("rally_join_requests")
+      .update({ status: "approved" })
+      .eq("id", request.id);
+
+    if (statusError) return fail(statusError.message);
+
+    revalidateRally(rally.id, rally.public_token);
+    revalidatePath("/app/players");
+
+    return { ok: true };
+  }
 
   // Reuse the player profile already linked to this account, else create one.
   const { data: existing } = await supabase
@@ -381,6 +433,45 @@ export async function hostDecideCheckIn(input: unknown): Promise<RallyActionStat
 
 // --- Public, token-gated actions (no login; the unguessable link is the key) ---
 
+/**
+ * The single source of truth for "who is acting". Resolved from the signed-in
+ * Clerk account only — either a member whose player profile is linked to that
+ * account, or the rally host acting as their own crowned seat.
+ */
+async function resolveMyMembership(supabase: ReturnType<typeof createSupabaseAdminClient>, rally: { id: string; host_id: string }) {
+  const { userId } = await auth();
+
+  if (!userId) return null;
+
+  const { data: linkedPlayers } = await supabase.from("players").select("id").eq("linked_clerk_user_id", userId);
+
+  if (linkedPlayers && linkedPlayers.length > 0) {
+    const { data: seat } = await supabase
+      .from("rally_members")
+      .select("*")
+      .eq("rally_id", rally.id)
+      .in("player_id", linkedPlayers.map((p) => p.id))
+      .maybeSingle();
+
+    if (seat) return seat;
+  }
+
+  const { data: host } = await supabase.from("hosts").select("id").eq("clerk_user_id", userId).maybeSingle();
+
+  if (host && host.id === rally.host_id) {
+    const { data: seat } = await supabase
+      .from("rally_members")
+      .select("*")
+      .eq("rally_id", rally.id)
+      .eq("is_host_member", true)
+      .maybeSingle();
+
+    if (seat) return seat;
+  }
+
+  return null;
+}
+
 async function requireRallyByToken(token: string) {
   const supabase = createSupabaseAdminClient();
 
@@ -436,15 +527,9 @@ export async function submitCheckIn(formData: FormData): Promise<RallyActionStat
     if (today < rally.start_date) return fail(`This rally starts on ${rally.start_date}.`);
     if (today > rally.end_date) return fail("This rally has already ended.");
 
-    const { data: member, error: memberError } = await supabase
-      .from("rally_members")
-      .select("*")
-      .eq("id", parsed.data.memberId)
-      .eq("rally_id", rally.id)
-      .maybeSingle();
+    const member = await resolveMyMembership(supabase, rally);
 
-    if (memberError) return fail(memberError.message);
-    if (!member) return fail("Pick who you are first.");
+    if (!member) return fail("Sign in with your own account to check in.");
 
     let proofImageUrl: string | null = null;
     const proof = formData.get("proof");
@@ -536,12 +621,12 @@ export async function castVote(input: unknown): Promise<RallyActionState> {
   try {
     const { supabase, rally } = await requireRallyByToken(parsed.data.token);
 
-    const [{ data: voter }, { data: checkIn }] = await Promise.all([
-      supabase.from("rally_members").select("*").eq("id", parsed.data.voterMemberId).eq("rally_id", rally.id).maybeSingle(),
+    const [voter, { data: checkIn }] = await Promise.all([
+      resolveMyMembership(supabase, rally),
       supabase.from("rally_check_ins").select("*").eq("id", parsed.data.checkInId).eq("rally_id", rally.id).maybeSingle(),
     ]);
 
-    if (!voter) return fail("Pick who you are first.");
+    if (!voter) return fail("Sign in with your own account to vote.");
     if (!checkIn) return fail("Check-in not found.");
     if (checkIn.rally_member_id === voter.id) return fail("You can't vote on your own check-in.");
     if (checkIn.decided_by_host) return fail("The host already settled this one.");

@@ -25,6 +25,8 @@ export type RallyMemberView = {
   isHostMember: boolean;
   joinedOn: string;
   checkedInToday: boolean;
+  /** Their player profile is linked to a real signed-in account. */
+  claimed: boolean;
 };
 
 export type CheckInView = {
@@ -65,7 +67,12 @@ export type RallyView = {
   recentFeed: CheckInView[];
 };
 
-type MemberWithPlayer = RallyMember & { name: string; avatar_key: string | null; color_key: string | null };
+type MemberWithPlayer = RallyMember & {
+  name: string;
+  avatar_key: string | null;
+  color_key: string | null;
+  linked_clerk_user_id: string | null;
+};
 
 export function buildRallyView(
   rally: Rally,
@@ -120,6 +127,7 @@ export function buildRallyView(
     isHostMember: member.is_host_member,
     joinedOn: member.joined_on,
     checkedInToday: todayCheckIns.some((c) => c.rally_member_id === member.id),
+    claimed: Boolean(member.linked_clerk_user_id),
   }));
 
   const standings: StandingView[] = rankStandings(
