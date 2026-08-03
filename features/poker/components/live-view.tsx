@@ -210,9 +210,10 @@ export function LiveView({ detail }: { detail: GameDetail }) {
                     e.stopPropagation();
                     quickBuyIn(seat.id);
                   }}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-gold-brand/40 bg-gold-tint text-gold-brand disabled:opacity-40"
+                  className="flex h-11 shrink-0 items-center gap-0.5 rounded-2xl border border-gold-brand/40 bg-gold-tint px-2.5 text-sm font-black text-gold-brand disabled:opacity-40"
                 >
-                  <Plus className="h-5 w-5" />
+                  <Plus className="h-4 w-4" />
+                  {formatMoney(presets[0] ?? 0)}
                 </button>
               </div>
             </div>

@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { PlayerAvatar } from "@/components/shared/player-avatar";
 import { createPokerGame } from "@/features/poker/actions";
 import { savePlayer } from "@/features/players/actions";
-import { coinsToMoney } from "@/features/settlement/calculations";
+
 import { defaultGameName, formatCoins, formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -33,9 +33,8 @@ export function NewGameWizard({ players, hostName }: { players: Player[]; hostNa
   const [location, setLocation] = useState("");
   const [ratioMoney, setRatioMoney] = useState("1000");
   const [ratioCoins, setRatioCoins] = useState("2000");
-  const [minBuyInCoins, setMinBuyInCoins] = useState("1000");
-  const [maxBuyInCoins, setMaxBuyInCoins] = useState("");
-  const [startingCoins, setStartingCoins] = useState("1000");
+  const [minBuyIn, setMinBuyIn] = useState("1000");
+  const [maxBuyIn, setMaxBuyIn] = useState("");
   const [allowRebuys, setAllowRebuys] = useState(true);
 
   const [seats, setSeats] = useState<Seat[]>([]);
@@ -49,8 +48,14 @@ export function NewGameWizard({ players, hostName }: { players: Player[]; hostNa
     coins: Number(ratioCoins) || 0,
   };
 
-  const minBuyInMoney =
-    ratio.money > 0 && ratio.coins > 0 ? coinsToMoney(Number(minBuyInCoins) || 0, ratio.money, ratio.coins) : 0;
+  // Hosts think in money ("minimum buy-in is Rs1,000"), so that's what we ask
+  // for; coins are derived from the ratio.
+  const toCoins = (money: number) =>
+    ratio.money > 0 && ratio.coins > 0 ? (money * ratio.coins) / ratio.money : 0;
+
+  const minBuyInCoins = toCoins(Number(minBuyIn) || 0);
+  const maxBuyInCoins = maxBuyIn ? toCoins(Number(maxBuyIn)) : null;
+  const minConvertsCleanly = Number(minBuyIn) > 0 && Number.isInteger(minBuyInCoins);
 
   function toggleSeat(playerId: string) {
     setError(null);
@@ -131,9 +136,10 @@ export function NewGameWizard({ players, hostName }: { players: Player[]; hostNa
     if (current === 0) {
       if (!name.trim()) return "Give the game a name.";
       if (!(Number(ratioMoney) > 0) || !(Number(ratioCoins) > 0)) return "Set a valid money-to-coin ratio.";
-      if (!(Number(minBuyInCoins) > 0)) return "Set a minimum buy-in in coins.";
-      if (!(Number(startingCoins) >= Number(minBuyInCoins))) return "Starting stack must be at least the minimum buy-in.";
-      if (maxBuyInCoins && Number(maxBuyInCoins) < Number(minBuyInCoins)) return "Max buy-in cannot be below the minimum.";
+      if (!(Number(minBuyIn) > 0)) return "Set a minimum buy-in.";
+      if (!minConvertsCleanly) return "That minimum buy-in doesn't convert to whole coins. Adjust it or the ratio.";
+      if (maxBuyIn && Number(maxBuyIn) < Number(minBuyIn)) return "Max buy-in cannot be below the minimum.";
+      if (maxBuyIn && !Number.isInteger(maxBuyInCoins ?? 0)) return "That max buy-in doesn't convert to whole coins.";
       return null;
     }
 
@@ -175,9 +181,9 @@ export function NewGameWizard({ players, hostName }: { players: Player[]; hostNa
         location: location.trim() || undefined,
         ratioMoneyAmount: Number(ratioMoney),
         ratioCoinAmount: Number(ratioCoins),
-        minBuyInCoins: Number(minBuyInCoins),
-        maxBuyInCoinsPerPlayer: maxBuyInCoins ? Number(maxBuyInCoins) : undefined,
-        startingCoinAmount: Number(startingCoins),
+        minBuyInCoins,
+        maxBuyInCoinsPerPlayer: maxBuyInCoins ?? undefined,
+        startingCoinAmount: minBuyInCoins,
         allowRebuys,
         players: seats.map((seat) => ({
           playerId: seat.playerId,
@@ -263,35 +269,32 @@ export function NewGameWizard({ players, hostName }: { players: Player[]; hostNa
             ) : null}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label htmlFor="min-buy-in">Min buy-in (coins)</Label>
-                <Input
-                  id="min-buy-in"
-                  inputMode="numeric"
-                  value={minBuyInCoins}
-                  onChange={(e) => setMinBuyInCoins(e.target.value)}
-                />
-                {minBuyInMoney > 0 ? <p className="text-xs text-muted">= {formatMoney(minBuyInMoney)}</p> : null}
+                <Label htmlFor="min-buy-in">Min buy-in (₹)</Label>
+                <Input id="min-buy-in" inputMode="numeric" value={minBuyIn} onChange={(e) => setMinBuyIn(e.target.value)} />
+                {Number(minBuyIn) > 0 ? (
+                  <p className={cn("text-xs", minConvertsCleanly ? "text-muted" : "text-red-danger")}>
+                    {minConvertsCleanly
+                      ? `= ${formatCoins(minBuyInCoins)} coins`
+                      : "Doesn't make whole coins"}
+                  </p>
+                ) : null}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="starting-coins">Starting stack (coins)</Label>
+                <Label htmlFor="max-buy-in">Max per player (₹, optional)</Label>
                 <Input
-                  id="starting-coins"
+                  id="max-buy-in"
                   inputMode="numeric"
-                  value={startingCoins}
-                  onChange={(e) => setStartingCoins(e.target.value)}
+                  placeholder="No limit"
+                  value={maxBuyIn}
+                  onChange={(e) => setMaxBuyIn(e.target.value)}
                 />
+                {maxBuyInCoins ? <p className="text-xs text-muted">= {formatCoins(maxBuyInCoins)} coins</p> : null}
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="max-buy-in">Max buy-in per player (coins, optional)</Label>
-              <Input
-                id="max-buy-in"
-                inputMode="numeric"
-                placeholder="No limit"
-                value={maxBuyInCoins}
-                onChange={(e) => setMaxBuyInCoins(e.target.value)}
-              />
-            </div>
+            <p className="text-xs leading-5 text-muted">
+              The minimum buy-in is the default one-tap amount at the table — most nights everyone buys in at
+              this, and you can always enter a custom amount.
+            </p>
             <button
               type="button"
               className="flex min-h-11 w-full items-center justify-between rounded-2xl border border-border bg-elevated px-4 py-3"
@@ -476,8 +479,9 @@ export function NewGameWizard({ players, hostName }: { players: Player[]; hostNa
           <Card className="space-y-2 bg-gold-tint">
             <h2 className="font-bold text-white">{name}</h2>
             <p className="text-sm text-muted">
-              {formatMoney(ratio.money)} = {formatCoins(ratio.coins)} coins · Min buy-in {formatCoins(Number(minBuyInCoins) || 0)}{" "}
-              coins · {seats.length} players{allowRebuys ? " · Rebuys on" : " · No rebuys"}
+              {formatMoney(ratio.money)} = {formatCoins(ratio.coins)} coins · Min buy-in{" "}
+              {formatMoney(Number(minBuyIn) || 0)} · {seats.length} players
+              {allowRebuys ? " · Rebuys on" : " · No rebuys"}
             </p>
             {seats.some((seat) => Number(seat.advanceMoney) > 0) ? (
               <p className="text-sm text-gold-brand">
