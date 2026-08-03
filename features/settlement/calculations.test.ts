@@ -210,6 +210,37 @@ describe("advances", () => {
     expect(lines).toEqual([{ fromGamePlayerId: "B", toGamePlayerId: "H", amount: 200 }]);
   });
 
+  it("a buy-in paid at the table is money with the host: player gets the difference back", () => {
+    // Varun paid ₹1,000 for chips and ends holding ₹500 of them.
+    // The host is holding his cash, so the host owes him ₹500 back.
+    const lines = generateSettlement(
+      "direct",
+      [
+        { gamePlayerId: "H", netResultMoney: 500, advanceMoney: 0 },
+        { gamePlayerId: "V", netResultMoney: -500, advanceMoney: 1000 },
+      ],
+      "H",
+    );
+    expect(lines).toEqual([{ fromGamePlayerId: "H", toGamePlayerId: "V", amount: 500 }]);
+  });
+
+  it("everyone prepaid: the host simply pays out each player's remaining value", () => {
+    // Both bought in ₹1,000 cash. A ends with ₹1,500 of chips, B with ₹500.
+    const lines = generateSettlement(
+      "host",
+      [
+        { gamePlayerId: "H", netResultMoney: 0, advanceMoney: 0 },
+        { gamePlayerId: "A", netResultMoney: 500, advanceMoney: 1000 },
+        { gamePlayerId: "B", netResultMoney: -500, advanceMoney: 1000 },
+      ],
+      "H",
+    );
+    expect(lines).toEqual([
+      { fromGamePlayerId: "H", toGamePlayerId: "A", amount: 1500 },
+      { fromGamePlayerId: "H", toGamePlayerId: "B", amount: 500 },
+    ]);
+  });
+
   it("host mode without a host seat throws", () => {
     expect(() =>
       generateSettlement(

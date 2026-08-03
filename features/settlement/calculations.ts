@@ -5,7 +5,11 @@
 export type PlayerResult = {
   gamePlayerId: string;
   netResultMoney: number;
-  /** Cash handed to the host up front. Netted into settlement, never into chip math. */
+  /**
+   * Money the host is already holding for this player — cash handed over up
+   * front plus any buy-in paid at the table. Netted into settlement only;
+   * it never touches chip math.
+   */
   advanceMoney?: number;
 };
 
@@ -79,7 +83,7 @@ export function applyAdvances(results: PlayerResult[], hostGamePlayerId: string 
   }
 
   if (!hostGamePlayerId || !results.some((r) => r.gamePlayerId === hostGamePlayerId)) {
-    throw new Error("Advances were recorded, so the host must be seated as a player to settle them.");
+    throw new Error("You're holding players' money, so mark which seat is yours before settling.");
   }
 
   return results.map((r) => {

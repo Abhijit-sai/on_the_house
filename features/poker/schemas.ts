@@ -68,9 +68,10 @@ export const createPokerGameSchema = z
 
 export type CreatePokerGameInput = z.infer<typeof createPokerGameSchema>;
 
+/** One amount, one payment status, applied to everyone selected in the round. */
 export const addBuyInSchema = z.object({
   gameId: z.string().uuid(),
-  gamePlayerId: z.string().uuid(),
+  gamePlayerIds: z.array(z.string().uuid()).min(1, "Pick who is buying in").max(9),
   moneyAmount: z.coerce.number().positive("Buy-in must be positive"),
   paymentStatus: z.enum(["paid", "unpaid", "settled_later"]).default("paid"),
   note: z.string().trim().max(200).optional(),

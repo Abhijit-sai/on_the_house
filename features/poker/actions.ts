@@ -257,15 +257,17 @@ export async function addBuyIn(input: unknown): Promise<GameActionState> {
 
     if (configError) return fail(configError.message);
 
-    // The seat must belong to this game — never trust a client-supplied id.
-    const { data: seat } = await supabase
+    // Every seat must belong to this game — never trust client-supplied ids.
+    const seatIds = [...new Set(parsed.data.gamePlayerIds)];
+    const { data: seats } = await supabase
       .from("game_players")
       .select("id")
-      .eq("id", parsed.data.gamePlayerId)
       .eq("game_id", game.id)
-      .maybeSingle();
+      .in("id", seatIds);
 
-    if (!seat) return fail("That player is not seated at this table.");
+    if (!seats || seats.length !== seatIds.length) {
+      return fail("Someone in that round is not seated at this table.");
+    }
 
     const moneyAmount = roundMoney(parsed.data.moneyAmount);
     const exactCoins = (moneyAmount * config.ratio_coin_amount) / config.ratio_money_amount;
@@ -282,40 +284,48 @@ export async function addBuyIn(input: unknown): Promise<GameActionState> {
 
     const { data: existing, error: existingError } = await supabase
       .from("poker_buy_ins")
-      .select("coin_amount")
-      .eq("game_player_id", parsed.data.gamePlayerId)
+      .select("game_player_id, coin_amount")
+      .eq("game_id", game.id)
+      .in("game_player_id", seatIds)
       .is("deleted_at", null);
 
     if (existingError) return fail(existingError.message);
 
-    if (config.max_buy_in_coins_per_player !== null) {
-      const totalCoins = existing.reduce((sum, b) => sum + b.coin_amount, 0) + coinAmount;
+    for (const seatId of seatIds) {
+      const own = existing.filter((b) => b.game_player_id === seatId);
 
-      if (totalCoins > config.max_buy_in_coins_per_player) {
-        return fail(`This would exceed the max of ${config.max_buy_in_coins_per_player} coins for this player.`);
+      if (config.max_buy_in_coins_per_player !== null) {
+        const totalCoins = own.reduce((sum, b) => sum + b.coin_amount, 0) + coinAmount;
+
+        if (totalCoins > config.max_buy_in_coins_per_player) {
+          return fail(`This would push someone past the max of ${config.max_buy_in_coins_per_player} coins.`);
+        }
+      }
+
+      if (!config.allow_rebuys && own.length > 0) {
+        return fail("Rebuys are disabled for this game.");
       }
     }
 
-    if (!config.allow_rebuys && existing.length > 0) {
-      return fail("Rebuys are disabled for this game.");
-    }
-
-    const { error } = await supabase.from("poker_buy_ins").insert({
-      game_id: game.id,
-      game_player_id: parsed.data.gamePlayerId,
-      money_amount: moneyAmount,
-      coin_amount: coinAmount,
-      payment_status: parsed.data.paymentStatus,
-      note: parsed.data.note || null,
-      created_by_host_id: host.id,
-    });
+    const { error } = await supabase.from("poker_buy_ins").insert(
+      seatIds.map((seatId) => ({
+        game_id: game.id,
+        game_player_id: seatId,
+        money_amount: moneyAmount,
+        coin_amount: coinAmount,
+        payment_status: parsed.data.paymentStatus,
+        note: parsed.data.note || null,
+        created_by_host_id: host.id,
+      })),
+    );
 
     if (error) return fail(error.message);
 
-    await logEvent(supabase, game.id, host.id, "buy_in_added", {
-      gamePlayerId: parsed.data.gamePlayerId,
+    await logEvent(supabase, game.id, host.id, "buy_in_round_added", {
+      gamePlayerIds: seatIds,
       moneyAmount,
       coinAmount,
+      paymentStatus: parsed.data.paymentStatus,
     });
     revalidateGame(game.id);
 
@@ -473,7 +483,14 @@ export async function submitFinalTally(input: unknown): Promise<GameActionState>
         results.map((r) => ({
           gamePlayerId: r.seat.id,
           netResultMoney: r.netResultMoney,
-          advanceMoney: r.seat.advance_money,
+          // Money the host is already holding for this player: cash handed
+          // over up front, plus every buy-in they actually paid at the table.
+          advanceMoney: roundMoney(
+            r.seat.advance_money +
+              buyInsRes.data
+                .filter((b) => b.game_player_id === r.seat.id && b.payment_status === "paid")
+                .reduce((sum, b) => sum + b.money_amount, 0),
+          ),
         })),
         hostSeat?.id ?? null,
       );
