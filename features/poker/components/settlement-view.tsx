@@ -111,7 +111,7 @@ export function SettlementView({ detail }: { detail: GameDetail }) {
               </p>
               <p className="text-xs text-muted">
                 In {formatMoney(tally.total_buy_in_money)} · out {formatMoney(tally.final_value_money)}
-                {seat.advance_money > 0 ? ` · adv ${formatMoney(seat.advance_money)}` : ""}
+                {seat.advance_money > 0 ? ` · ${formatMoney(seat.advance_money)} prepaid` : ""}
               </p>
             </div>
             <p

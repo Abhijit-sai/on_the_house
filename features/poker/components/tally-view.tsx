@@ -142,7 +142,7 @@ export function TallyView({ detail }: { detail: GameDetail }) {
             <p className="text-sm font-bold text-white">Simplified — pay each other</p>
             <p className="text-xs text-muted">
               Fewest payments, losers pay winners directly.
-              {directDisabled ? " Unavailable: advances were paid to you, but you have no seat." : ""}
+              {directDisabled ? " Unavailable: you hold players’ cash but have no seat — claim one above." : ""}
             </p>
           </button>
           <button
@@ -163,8 +163,8 @@ export function TallyView({ detail }: { detail: GameDetail }) {
         </div>
         {hasAdvances ? (
           <p className="rounded-2xl bg-gold-tint px-3 py-2 text-xs text-gold-brand">
-            Advances of {formatMoney(seats.reduce((sum, seat) => sum + seat.advance_money, 0))} are already with you —
-            they'll be netted into the final amounts automatically.
+            {formatMoney(seats.reduce((sum, seat) => sum + seat.advance_money, 0))} of players' cash is already with
+            you — it's netted off the final amounts automatically.
           </p>
         ) : null}
       </Card>

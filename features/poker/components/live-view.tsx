@@ -159,7 +159,7 @@ export function LiveView({ detail }: { detail: GameDetail }) {
                   </p>
                   <p className="text-xs text-muted">
                     {totalsForSeat.count} buy-in{totalsForSeat.count === 1 ? "" : "s"}
-                    {seat.advance_money > 0 ? ` · Adv ${formatMoney(seat.advance_money)}` : ""}
+                    {seat.advance_money > 0 ? ` · ${formatMoney(seat.advance_money)} with you` : ""}
                   </p>
                 </div>
                 <div className="text-right">
@@ -335,7 +335,7 @@ export function LiveView({ detail }: { detail: GameDetail }) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="advance-edit">Advance paid to you (₹)</Label>
+              <Label htmlFor="advance-edit">Cash with you (₹)</Label>
               <div className="flex gap-2">
                 <Input
                   id="advance-edit"
@@ -348,6 +348,10 @@ export function LiveView({ detail }: { detail: GameDetail }) {
                   Save
                 </Button>
               </div>
+              <p className="text-xs leading-5 text-muted">
+                Money they handed you outside of buy-ins — no chips issued. It's netted off what they owe at
+                settlement.
+              </p>
             </div>
 
             {error ? (

@@ -141,7 +141,7 @@ export function NewGameWizard({ players, hostName }: { players: Player[]; hostNa
       if (seats.length < 2) return "Seat at least 2 players.";
       const hasAdvances = seats.some((seat) => Number(seat.advanceMoney) > 0);
       if (hasAdvances && !seats.some((seat) => seat.isHostPlayer)) {
-        return "Advances are paid to you — tap the crown on your own seat first.";
+        return "That cash is held by you — tap the crown on your own seat first.";
       }
       return null;
     }
@@ -365,7 +365,12 @@ export function NewGameWizard({ players, hostName }: { players: Player[]; hostNa
             <Card className="space-y-3">
               <h2 className="font-bold text-white">Seated players</h2>
               <p className="text-xs text-muted">
-                Tap the crown to mark your own seat. Record any cash paid to you up front as an advance.
+                Tap the crown to mark your own seat.
+              </p>
+              <p className="rounded-2xl border border-border bg-elevated px-3 py-2 text-xs leading-5 text-muted">
+                <span className="font-bold text-cream">Cash with you</span> — money a player handed you before the
+                game (not a buy-in, and it issues no chips). It's held against what they owe, so at settlement they
+                pay that much less, or get it back if they finish up.
               </p>
               <div className="space-y-2">
                 {seats.map((seat) => {
@@ -394,7 +399,7 @@ export function NewGameWizard({ players, hostName }: { players: Player[]; hostNa
                       </div>
                       <div className="mt-2 flex items-center gap-2">
                         <Label htmlFor={`advance-${seat.playerId}`} className="shrink-0 text-xs text-muted">
-                          Advance ₹
+                          Cash with you ₹
                         </Label>
                         <Input
                           id={`advance-${seat.playerId}`}
@@ -476,7 +481,7 @@ export function NewGameWizard({ players, hostName }: { players: Player[]; hostNa
             </p>
             {seats.some((seat) => Number(seat.advanceMoney) > 0) ? (
               <p className="text-sm text-gold-brand">
-                Advances collected:{" "}
+                Cash already with you:{" "}
                 {formatMoney(seats.reduce((sum, seat) => sum + (Number(seat.advanceMoney) || 0), 0))}
               </p>
             ) : null}
@@ -490,8 +495,8 @@ export function NewGameWizard({ players, hostName }: { players: Player[]; hostNa
 
       {seats.length > 0 && !seats.some((seat) => seat.isHostPlayer) ? (
         <p className="rounded-2xl border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
-          No seat is marked as you — tap the crown on your own seat. Without it you can't record advances or settle
-          through yourself as the bank. You can also claim your seat later.
+          No seat is marked as you — tap the crown on your own seat. Without it you can't hold cash for players or
+          settle through yourself as the bank. You can also claim your seat later.
         </p>
       ) : null}
 
