@@ -9,7 +9,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { PlayerAvatar } from "@/components/shared/player-avatar";
-import { addBuyIn, endGame, pauseGame, removeBuyIn, resumeGame, setAdvance } from "@/features/poker/actions";
+import {
+  addBuyIn,
+  endGame,
+  pauseGame,
+  removeBuyIn,
+  resumeGame,
+  setAdvance,
+  setBuyInPayment,
+} from "@/features/poker/actions";
 import { ClaimSeatCard } from "@/features/poker/components/claim-seat-card";
 import { buyInPresets, seatBuyIns, seatTotals, tableTotals } from "@/features/poker/derive";
 import type { GameDetail } from "@/features/poker/queries";
@@ -18,8 +26,8 @@ import { formatCoins, formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const paymentStatusOptions: { value: BuyInPaymentStatus; label: string }[] = [
-  { value: "paid", label: "Paid" },
-  { value: "unpaid", label: "Unpaid" },
+  { value: "paid", label: "Cash with you" },
+  { value: "unpaid", label: "Not collected" },
   { value: "settled_later", label: "Settle later" },
 ];
 
@@ -32,7 +40,7 @@ export function LiveView({ detail }: { detail: GameDetail }) {
   const [buyInSheetOpen, setBuyInSheetOpen] = useState(false);
   const [roundSeatIds, setRoundSeatIds] = useState<string[]>([]);
   const [amount, setAmount] = useState("");
-  const [paymentStatus, setPaymentStatus] = useState<BuyInPaymentStatus>("paid");
+  const [paymentStatus, setPaymentStatus] = useState<BuyInPaymentStatus>("unpaid");
 
   const [seatSheetId, setSeatSheetId] = useState<string | null>(null);
   const [advanceDraft, setAdvanceDraft] = useState("");
@@ -104,6 +112,14 @@ export function LiveView({ detail }: { detail: GameDetail }) {
       }
 
       setBuyInSheetOpen(false);
+    });
+  }
+
+  function togglePayment(buyInId: string, next: BuyInPaymentStatus) {
+    startTransition(async () => {
+      const result = await setBuyInPayment({ gameId: game.id, buyInId, paymentStatus: next });
+
+      if (!result.ok) setError(result.message ?? "Could not update the payment.");
     });
   }
 
@@ -388,10 +404,22 @@ export function LiveView({ detail }: { detail: GameDetail }) {
                     <div key={buyIn.id} className="flex items-center gap-3 rounded-2xl border border-border bg-elevated p-3">
                       <div className="flex-1">
                         <p className="font-bold tabular-nums text-white">{formatMoney(buyIn.money_amount)}</p>
-                        <p className="text-xs text-muted">
-                          {formatCoins(buyIn.coin_amount)} coins ·{" "}
-                          {paymentStatusOptions.find((o) => o.value === buyIn.payment_status)?.label}
-                        </p>
+                        <p className="text-xs text-muted">{formatCoins(buyIn.coin_amount)} coins</p>
+                        <button
+                          type="button"
+                          disabled={isPending}
+                          onClick={() =>
+                            togglePayment(buyIn.id, buyIn.payment_status === "paid" ? "unpaid" : "paid")
+                          }
+                          className={cn(
+                            "mt-1 rounded-full border px-2.5 py-0.5 text-[11px] font-bold",
+                            buyIn.payment_status === "paid"
+                              ? "border-success/40 bg-success/10 text-success"
+                              : "border-border bg-elevated text-muted",
+                          )}
+                        >
+                          {buyIn.payment_status === "paid" ? "Cash with you" : "Not collected"}
+                        </button>
                       </div>
                       <Button
                         variant="ghost"

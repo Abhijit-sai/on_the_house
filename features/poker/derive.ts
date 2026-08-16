@@ -18,6 +18,19 @@ export function seatTotals(seatId: string, buyIns: PokerBuyIn[]) {
   };
 }
 
+/**
+ * Money the host is physically holding for one seat: cash handed over up
+ * front plus every buy-in whose cash actually changed hands. Mirrors what
+ * `submitFinalTally` feeds the settlement engine.
+ */
+export function seatCashWithHost(seat: { id: string; advance_money: number }, buyIns: PokerBuyIn[]) {
+  const paid = buyIns
+    .filter((b) => b.game_player_id === seat.id && b.payment_status === "paid")
+    .reduce((sum, b) => sum + b.money_amount, 0);
+
+  return roundMoney(seat.advance_money + paid);
+}
+
 export function tableTotals(buyIns: PokerBuyIn[]) {
   return {
     count: buyIns.length,

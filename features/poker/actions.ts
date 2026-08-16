@@ -11,6 +11,7 @@ import {
   linePaymentSchema,
   removeBuyInSchema,
   setAdvanceSchema,
+  setBuyInPaymentSchema,
 } from "@/features/poker/schemas";
 import {
   computeNetResult,
@@ -325,6 +326,42 @@ export async function addBuyIn(input: unknown): Promise<GameActionState> {
       gamePlayerIds: seatIds,
       moneyAmount,
       coinAmount,
+      paymentStatus: parsed.data.paymentStatus,
+    });
+    revalidateGame(game.id);
+
+    return { ok: true };
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : "Something went wrong.");
+  }
+}
+
+/** Correct whether a buy-in's cash actually reached the host. */
+export async function setBuyInPayment(input: unknown): Promise<GameActionState> {
+  const parsed = setBuyInPaymentSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return fail("Check the payment update.");
+  }
+
+  try {
+    const { host, supabase, game } = await requireOwnedGame(parsed.data.gameId, [
+      "live",
+      "paused",
+      "tally_pending",
+    ]);
+
+    const { error } = await supabase
+      .from("poker_buy_ins")
+      .update({ payment_status: parsed.data.paymentStatus })
+      .eq("id", parsed.data.buyInId)
+      .eq("game_id", game.id)
+      .is("deleted_at", null);
+
+    if (error) return fail(error.message);
+
+    await logEvent(supabase, game.id, host.id, "buy_in_payment_changed", {
+      buyInId: parsed.data.buyInId,
       paymentStatus: parsed.data.paymentStatus,
     });
     revalidateGame(game.id);

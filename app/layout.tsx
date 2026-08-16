@@ -9,8 +9,15 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "On the House",
-  description: "A private offline game-night tracker and settlement helper.",
+  // Absolute URLs for link previews; falls back to the deployed Vercel URL.
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL ??
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"),
+  ),
+  title: { default: "On the House", template: "%s · On the House" },
+  description: "Host the night, settle the chaos. House party games for your crew.",
+  openGraph: { type: "website", siteName: "On the House" },
+  twitter: { card: "summary_large_image" },
 };
 
 export const viewport: Viewport = {

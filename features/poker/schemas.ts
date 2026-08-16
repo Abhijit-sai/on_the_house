@@ -68,16 +68,28 @@ export const createPokerGameSchema = z
 
 export type CreatePokerGameInput = z.infer<typeof createPokerGameSchema>;
 
-/** One amount, one payment status, applied to everyone selected in the round. */
+/**
+ * One amount, one payment status, applied to everyone selected in the round.
+ *
+ * The default is deliberately `unpaid`: "paid" means the host is physically
+ * holding that cash and it gets netted out of the settlement, so it must
+ * always be a deliberate choice, never a default nobody noticed.
+ */
 export const addBuyInSchema = z.object({
   gameId: z.string().uuid(),
   gamePlayerIds: z.array(z.string().uuid()).min(1, "Pick who is buying in").max(9),
   moneyAmount: z.coerce.number().positive("Buy-in must be positive"),
-  paymentStatus: z.enum(["paid", "unpaid", "settled_later"]).default("paid"),
+  paymentStatus: z.enum(["paid", "unpaid", "settled_later"]).default("unpaid"),
   note: z.string().trim().max(200).optional(),
 });
 
 export type AddBuyInInput = z.infer<typeof addBuyInSchema>;
+
+export const setBuyInPaymentSchema = z.object({
+  gameId: z.string().uuid(),
+  buyInId: z.string().uuid(),
+  paymentStatus: z.enum(["paid", "unpaid", "settled_later"]),
+});
 
 export const removeBuyInSchema = z.object({
   gameId: z.string().uuid(),

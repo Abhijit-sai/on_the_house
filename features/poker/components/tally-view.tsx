@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, Crown, Loader2, Scale } from "lucide-react";
+import { ArrowLeft, Check, Crown, Loader2, Scale, Wallet } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import type { SettlementMode } from "@/db/types/database";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/shared/player-avatar";
 import { backToLive, submitFinalTally } from "@/features/poker/actions";
 import { ClaimSeatCard } from "@/features/poker/components/claim-seat-card";
-import { seatTotals, tableTotals } from "@/features/poker/derive";
+import { seatCashWithHost, seatTotals, tableTotals } from "@/features/poker/derive";
 import type { GameDetail } from "@/features/poker/queries";
 import { validateFinalTally } from "@/features/settlement/calculations";
 import { formatCoins, formatMoney } from "@/lib/format";
@@ -22,7 +22,15 @@ export function TallyView({ detail }: { detail: GameDetail }) {
   const [counts, setCounts] = useState<Record<string, string>>({});
 
   const hostSeat = seats.find((seat) => seat.is_host_player) ?? null;
-  const hasAdvances = seats.some((seat) => seat.advance_money > 0);
+
+  // Money the app believes the host is physically holding: cash handed over
+  // up front plus every buy-in marked paid. It changes who pays whom, so the
+  // host has to see it before settling.
+  const cashWithHost = useMemo(
+    () => seats.reduce((sum, seat) => sum + seatCashWithHost(seat, buyIns), 0),
+    [seats, buyIns],
+  );
+  const hasAdvances = cashWithHost > 0;
   const [mode, setMode] = useState<SettlementMode>(hasAdvances || hostSeat ? "host" : "direct");
 
   const totals = useMemo(() => tableTotals(buyIns), [buyIns]);
@@ -125,6 +133,30 @@ export function TallyView({ detail }: { detail: GameDetail }) {
         })}
       </div>
 
+      {cashWithHost > 0 ? (
+        <Card className="space-y-2 border-warning/50">
+          <div className="flex items-center gap-2">
+            <Wallet className="h-4 w-4 text-warning" />
+            <h2 className="font-bold text-white">Cash you're holding</h2>
+          </div>
+          <p className="text-3xl font-black tabular-nums text-warning">{formatMoney(cashWithHost)}</p>
+          <p className="text-xs leading-5 text-muted">
+            Buy-ins marked paid, plus cash handed to you up front. The settlement pays this back out, so it changes
+            who owes whom. If that money never actually reached you, go back and mark those buy-ins unpaid.
+          </p>
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            {seats
+              .filter((seat) => seatCashWithHost(seat, buyIns) > 0)
+              .map((seat) => (
+                <p key={seat.id} className="truncate text-xs text-muted">
+                  {seat.player.name}{" "}
+                  <span className="font-bold text-cream">{formatMoney(seatCashWithHost(seat, buyIns))}</span>
+                </p>
+              ))}
+          </div>
+        </Card>
+      ) : null}
+
       <ClaimSeatCard gameId={game.id} seats={seats} />
 
       <Card className="space-y-3">
@@ -161,12 +193,7 @@ export function TallyView({ detail }: { detail: GameDetail }) {
             </p>
           </button>
         </div>
-        {hasAdvances ? (
-          <p className="rounded-2xl bg-gold-tint px-3 py-2 text-xs text-gold-brand">
-            {formatMoney(seats.reduce((sum, seat) => sum + seat.advance_money, 0))} of players' cash is already with
-            you — it's netted off the final amounts automatically.
-          </p>
-        ) : null}
+
       </Card>
 
       {error ? (

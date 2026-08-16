@@ -241,6 +241,28 @@ describe("advances", () => {
     ]);
   });
 
+  // Regression: a whole table defaulting to "paid" made the app believe the
+  // host held every rupee, turning a normal night into "host pays everyone".
+  // Nothing collected must mean nothing prepaid.
+  it("collecting no cash leaves settlement as plain loser-pays-winner", () => {
+    const lines = generateSettlement(
+      "direct",
+      [
+        { gamePlayerId: "H", netResultMoney: -745, advanceMoney: 0 },
+        { gamePlayerId: "W", netResultMoney: 2450, advanceMoney: 0 },
+        { gamePlayerId: "L", netResultMoney: -1705, advanceMoney: 0 },
+      ],
+      "H",
+    );
+    expect(lines).toEqual([
+      { fromGamePlayerId: "L", toGamePlayerId: "W", amount: 1705 },
+      { fromGamePlayerId: "H", toGamePlayerId: "W", amount: 745 },
+    ]);
+    // The host only ever moves their own net, never the whole table's money.
+    const hostOutflow = lines.filter((l) => l.fromGamePlayerId === "H").reduce((s, l) => s + l.amount, 0);
+    expect(hostOutflow).toBe(745);
+  });
+
   it("host mode without a host seat throws", () => {
     expect(() =>
       generateSettlement(
