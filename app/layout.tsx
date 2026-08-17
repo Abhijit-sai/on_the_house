@@ -33,7 +33,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up">
       {/* suppressHydrationWarning: browser extensions (Grammarly, Scribe, …) inject
           attributes on <html>/<body> before React hydrates; only these two nodes are exempt. */}
       <html lang="en" className="dark" suppressHydrationWarning>
