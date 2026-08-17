@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Coins, Crown, Flag, Loader2, Pause, Play, Plus, Trash2 } from "lucide-react";
+import { Check, Coins, Crown, Flag, Loader2, Minus, Pause, Play, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import type { BuyInPaymentStatus } from "@/db/types/database";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ export function LiveView({ detail }: { detail: GameDetail }) {
 
   const [buyInSheetOpen, setBuyInSheetOpen] = useState(false);
   const [roundSeatIds, setRoundSeatIds] = useState<string[]>([]);
+  const [focusedSeatId, setFocusedSeatId] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<BuyInPaymentStatus>("unpaid");
 
@@ -49,6 +50,7 @@ export function LiveView({ detail }: { detail: GameDetail }) {
   const totals = useMemo(() => tableTotals(buyIns), [buyIns]);
   const presets = useMemo(() => buyInPresets(config), [config]);
   const seatSheet = seats.find((seat) => seat.id === seatSheetId) ?? null;
+  const focusedSeat = seats.find((seat) => seat.id === focusedSeatId) ?? null;
 
   const amountNumber = Number(amount) || 0;
   const amountCoins =
@@ -58,6 +60,7 @@ export function LiveView({ detail }: { detail: GameDetail }) {
 
   function openBuyInSheet(seatId?: string) {
     setError(null);
+    setFocusedSeatId(seatId ?? null);
 
     if (seatId) {
       setRoundSeatIds([seatId]);
@@ -71,25 +74,17 @@ export function LiveView({ detail }: { detail: GameDetail }) {
     setBuyInSheetOpen(true);
   }
 
+  /** Nudge the amount by one minimum buy-in, never below one. */
+  function stepAmount(direction: -1 | 1) {
+    const step = presets[0] || 1;
+    const next = Math.max(step, (Number(amount) || 0) + direction * step);
+    setAmount(String(next));
+  }
+
   function toggleRoundSeat(seatId: string) {
     setRoundSeatIds((current) =>
       current.includes(seatId) ? current.filter((id) => id !== seatId) : [...current, seatId],
     );
-  }
-
-  /** One tap on a player row: same amount and payment status as last time. */
-  function quickBuyIn(seatId: string) {
-    setError(null);
-    startTransition(async () => {
-      const result = await addBuyIn({
-        gameId: game.id,
-        gamePlayerIds: [seatId],
-        moneyAmount: presets[0] ?? 0,
-        paymentStatus,
-      });
-
-      if (!result.ok) setError(result.message ?? "Could not add the buy-in.");
-    });
   }
 
   function submitBuyIn() {
@@ -220,16 +215,16 @@ export function LiveView({ detail }: { detail: GameDetail }) {
                 </div>
                 <button
                   type="button"
-                  aria-label={`Add ${formatMoney(presets[0] ?? 0)} buy-in for ${seat.player.name}`}
+                  aria-label={`Add a buy-in for ${seat.player.name}`}
                   disabled={paused || isPending}
                   onClick={(e) => {
                     e.stopPropagation();
-                    quickBuyIn(seat.id);
+                    openBuyInSheet(seat.id);
                   }}
                   className="flex h-11 shrink-0 items-center gap-0.5 rounded-2xl border border-gold-brand/40 bg-gold-tint px-2.5 text-sm font-black text-gold-brand disabled:opacity-40"
                 >
                   <Plus className="h-4 w-4" />
-                  {formatMoney(presets[0] ?? 0)}
+                  Buy-in
                 </button>
               </div>
             </div>
@@ -269,47 +264,85 @@ export function LiveView({ detail }: { detail: GameDetail }) {
         </Button>
       </div>
 
-      <BottomSheet open={buyInSheetOpen} onClose={() => setBuyInSheetOpen(false)} title="Add buy-in">
+      <BottomSheet
+        open={buyInSheetOpen}
+        onClose={() => setBuyInSheetOpen(false)}
+        title={focusedSeat ? `Buy-in \u00b7 ${focusedSeat.player.name}` : "Buy-in round"}
+      >
         <div className="space-y-4">
+          {focusedSeat ? null : (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Who is buying in?</Label>
+                <button
+                  type="button"
+                  className="text-xs font-bold text-gold-brand"
+                  onClick={() => setRoundSeatIds(roundSeatIds.length === seats.length ? [] : seats.map((s) => s.id))}
+                >
+                  {roundSeatIds.length === seats.length ? "Clear all" : "Everyone"}
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {seats.map((seat) => {
+                  const selected = roundSeatIds.includes(seat.id);
+
+                  return (
+                    <button
+                      key={seat.id}
+                      type="button"
+                      onClick={() => toggleRoundSeat(seat.id)}
+                      className={cn(
+                        "flex min-h-11 items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold",
+                        selected
+                          ? "border-gold-brand/60 bg-gold-tint text-gold-brand"
+                          : "border-border bg-elevated text-cream",
+                      )}
+                    >
+                      <PlayerAvatar name={seat.player.name} colorKey={seat.player.color_key} size="sm" />
+                      {seat.player.name}
+                      {selected ? <Check className="h-3.5 w-3.5" /> : null}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted">Everyone selected gets the same amount.</p>
+            </div>
+          )}
+
+          {/* amount stepper */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Who is buying in?</Label>
-              <button
+            <Label htmlFor="buy-in-amount">How much?</Label>
+            <div className="flex items-center gap-3">
+              <Button
                 type="button"
-                className="text-xs font-bold text-gold-brand"
-                onClick={() => setRoundSeatIds(roundSeatIds.length === seats.length ? [] : seats.map((s) => s.id))}
+                variant="secondary"
+                size="icon"
+                className="h-14 w-14 shrink-0 text-xl"
+                aria-label="Decrease amount"
+                disabled={amountNumber <= (presets[0] || 1)}
+                onClick={() => stepAmount(-1)}
               >
-                {roundSeatIds.length === seats.length ? "Clear all" : "Everyone"}
-              </button>
+                <Minus className="h-6 w-6" />
+              </Button>
+              <Input
+                id="buy-in-amount"
+                inputMode="numeric"
+                placeholder="0"
+                className="h-14 flex-1 text-center text-2xl font-black tabular-nums"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                className="h-14 w-14 shrink-0 text-xl"
+                aria-label="Increase amount"
+                onClick={() => stepAmount(1)}
+              >
+                <Plus className="h-6 w-6" />
+              </Button>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {seats.map((seat) => {
-                const selected = roundSeatIds.includes(seat.id);
-
-                return (
-                  <button
-                    key={seat.id}
-                    type="button"
-                    onClick={() => toggleRoundSeat(seat.id)}
-                    className={cn(
-                      "flex min-h-11 items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold",
-                      selected
-                        ? "border-gold-brand/60 bg-gold-tint text-gold-brand"
-                        : "border-border bg-elevated text-cream",
-                    )}
-                  >
-                    <PlayerAvatar name={seat.player.name} colorKey={seat.player.color_key} size="sm" />
-                    {seat.player.name}
-                    {selected ? <Check className="h-3.5 w-3.5" /> : null}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-xs text-muted">Tap everyone buying in this round — they all get the same amount.</p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="buy-in-amount">Amount</Label>
             <div className="grid grid-cols-3 gap-2">
               {presets.map((preset) => (
                 <button
@@ -317,7 +350,7 @@ export function LiveView({ detail }: { detail: GameDetail }) {
                   type="button"
                   onClick={() => setAmount(String(preset))}
                   className={cn(
-                    "min-h-11 rounded-2xl border px-2 py-2 text-sm font-black tabular-nums",
+                    "min-h-10 rounded-2xl border px-2 py-2 text-sm font-black tabular-nums",
                     Number(amount) === preset
                       ? "border-gold-brand/60 bg-gold-tint text-gold-brand"
                       : "border-border bg-elevated text-cream",
@@ -327,23 +360,9 @@ export function LiveView({ detail }: { detail: GameDetail }) {
                 </button>
               ))}
             </div>
-            <Input
-              id="buy-in-amount"
-              inputMode="numeric"
-              placeholder="Custom amount"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-            {amountNumber > 0 ? (
-              <p className={cn("flex items-center gap-1.5 text-sm", amountIsWhole ? "text-gold-brand" : "text-red-danger")}>
-                <Coins className="h-4 w-4" />
-                {amountIsWhole
-                  ? `${formatCoins(amountCoins)} coins`
-                  : "Doesn't convert to whole coins — adjust the amount."}
-              </p>
-            ) : null}
           </div>
 
+          {/* payment */}
           <div className="space-y-2">
             <Label>Did they hand over the cash?</Label>
             <div className="grid grid-cols-3 gap-2">
@@ -363,11 +382,44 @@ export function LiveView({ detail }: { detail: GameDetail }) {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-muted">
-              {paymentStatus === "paid"
-                ? "Cash is with you \u2014 netted off what they owe at settlement."
-                : "Nothing collected yet \u2014 the full amount rides on the final settlement."}
-            </p>
+          </div>
+
+          {/* summary */}
+          <div className="space-y-1.5 rounded-2xl border border-border bg-elevated p-3">
+            {amountNumber > 0 && !amountIsWhole ? (
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-red-danger">
+                <Coins className="h-4 w-4" />
+                {formatMoney(amountNumber)} doesn&apos;t convert to whole coins — adjust it.
+              </p>
+            ) : (
+              <>
+                <p className="flex items-center justify-between text-sm">
+                  <span className="text-muted">{focusedSeat ? "Buy-in" : `${roundSeatIds.length} \u00d7 ${formatMoney(amountNumber)}`}</span>
+                  <span className="font-black tabular-nums text-white">
+                    {formatMoney(amountNumber * (focusedSeat ? 1 : roundSeatIds.length))}
+                  </span>
+                </p>
+                <p className="flex items-center justify-between text-sm">
+                  <span className="text-muted">Chips issued</span>
+                  <span className="font-bold tabular-nums text-gold-brand">
+                    {formatCoins(amountCoins * (focusedSeat ? 1 : roundSeatIds.length))} coins
+                  </span>
+                </p>
+                {focusedSeat ? (
+                  <p className="flex items-center justify-between border-t border-border pt-1.5 text-sm">
+                    <span className="text-muted">{focusedSeat.player.name}&apos;s total after this</span>
+                    <span className="font-black tabular-nums text-white">
+                      {formatMoney(seatTotals(focusedSeat.id, buyIns).money + amountNumber)}
+                    </span>
+                  </p>
+                ) : null}
+                <p className="pt-0.5 text-xs text-muted">
+                  {paymentStatus === "paid"
+                    ? "Cash is with you \u2014 netted off what they owe at settlement."
+                    : "Nothing collected \u2014 the full amount rides on the final settlement."}
+                </p>
+              </>
+            )}
           </div>
 
           {error ? (
@@ -379,10 +431,10 @@ export function LiveView({ detail }: { detail: GameDetail }) {
             disabled={isPending || !amountIsWhole || roundSeatIds.length === 0}
             onClick={submitBuyIn}
           >
-            {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
-            {roundSeatIds.length > 1
-              ? `Add ${formatMoney(amountNumber)} \u00d7 ${roundSeatIds.length} = ${formatMoney(amountNumber * roundSeatIds.length)}`
-              : `Add ${amountNumber > 0 ? formatMoney(amountNumber) : "buy-in"}`}
+            {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
+            {focusedSeat
+              ? `Add ${formatMoney(amountNumber)} to ${focusedSeat.player.name}`
+              : `Confirm ${roundSeatIds.length} buy-in${roundSeatIds.length === 1 ? "" : "s"}`}
           </Button>
         </div>
       </BottomSheet>
