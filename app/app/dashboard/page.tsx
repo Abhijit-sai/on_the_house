@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentHost } from "@/features/hosts/queries";
 import { GameCard } from "@/features/poker/components/game-card";
-import { getHostStats, listGamesForCurrentHost } from "@/features/poker/queries";
+import { PokerLeaderboard } from "@/features/poker/components/poker-leaderboard";
+import { getHostStats, getPokerLeaderboard, listGamesForCurrentHost } from "@/features/poker/queries";
 import { formatMoney, formatSignedMoney } from "@/lib/format";
 
 export default async function DashboardPage() {
@@ -17,7 +18,7 @@ export default async function DashboardPage() {
 
   const games = await listGamesForCurrentHost();
   const closedGameIds = games.filter((g) => g.status === "closed").map((g) => g.id);
-  const stats = await getHostStats(closedGameIds);
+  const [stats, leaderboard] = await Promise.all([getHostStats(closedGameIds), getPokerLeaderboard()]);
 
   const liveGames = games.filter((g) => g.status === "live" || g.status === "paused" || g.status === "tally_pending");
   const draftGames = games.filter((g) => g.status === "draft");
@@ -74,6 +75,21 @@ export default async function DashboardPage() {
           )}
         </Card>
       </section>
+
+      {leaderboard.rows.length > 0 ? (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-2 font-bold text-white">
+              <Trophy className="h-4 w-4 text-gold-brand" />
+              All-time standings
+            </h2>
+            <Link href="/app/games/leaderboard" className="text-xs font-bold text-gold-brand">
+              See all {leaderboard.rows.length} →
+            </Link>
+          </div>
+          <PokerLeaderboard rows={leaderboard.rows} summary={leaderboard.summary} limit={3} />
+        </section>
+      ) : null}
 
       {sections.map((section) => (
         <section key={section.title} className="space-y-3">

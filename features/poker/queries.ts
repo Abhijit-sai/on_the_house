@@ -1,4 +1,10 @@
 import { requireCurrentHost } from "@/features/hosts/queries";
+import {
+  buildLeaderboard,
+  summarise,
+  type LeaderboardRow,
+  type PlayerGameResult,
+} from "@/features/poker/leaderboard";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type {
   Game,
@@ -154,4 +160,69 @@ export async function getHostStats(gameIds: string[]): Promise<HostStats> {
   }
 
   return { volumeTracked, biggestWinner, biggestLoser };
+}
+
+/**
+ * Lifetime standings across every settled game night. Only closed games count
+ * — a night that was cancelled or is still being settled has no final word.
+ */
+export async function getPokerLeaderboard() {
+  const host = await requireCurrentHost();
+  const supabase = createSupabaseAdminClient();
+
+  const { data: games, error: gamesError } = await supabase
+    .from("games")
+    .select("id, name, closed_at, created_at")
+    .eq("host_id", host.id)
+    .eq("status", "closed");
+
+  if (gamesError) throw new Error(gamesError.message);
+
+  if (games.length === 0) {
+    return { rows: [] as LeaderboardRow[], summary: summarise([], 0) };
+  }
+
+  const gameIds = games.map((g) => g.id);
+
+  const [seatsRes, talliesRes, playersRes] = await Promise.all([
+    supabase.from("game_players").select("id, game_id, player_id").in("game_id", gameIds),
+    supabase
+      .from("poker_final_tallies")
+      .select("game_id, game_player_id, net_result_money, total_buy_in_money")
+      .in("game_id", gameIds),
+    supabase.from("players").select("id, name, color_key").eq("host_id", host.id),
+  ]);
+
+  if (seatsRes.error) throw new Error(seatsRes.error.message);
+  if (talliesRes.error) throw new Error(talliesRes.error.message);
+  if (playersRes.error) throw new Error(playersRes.error.message);
+
+  const seatById = new Map(seatsRes.data.map((seat) => [seat.id, seat]));
+  const gameById = new Map(games.map((game) => [game.id, game]));
+  const playerById = new Map(playersRes.data.map((player) => [player.id, player]));
+
+  const results: PlayerGameResult[] = [];
+
+  for (const tally of talliesRes.data) {
+    const seat = seatById.get(tally.game_player_id);
+    const game = seat ? gameById.get(seat.game_id) : undefined;
+    const player = seat ? playerById.get(seat.player_id) : undefined;
+
+    if (!seat || !game || !player) continue;
+
+    results.push({
+      playerId: player.id,
+      name: player.name,
+      colorKey: player.color_key,
+      gameId: game.id,
+      gameName: game.name,
+      playedAt: game.closed_at ?? game.created_at,
+      netResultMoney: tally.net_result_money,
+      buyInMoney: tally.total_buy_in_money,
+    });
+  }
+
+  const rows = buildLeaderboard(results);
+
+  return { rows, summary: summarise(rows, games.length) };
 }
