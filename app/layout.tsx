@@ -9,10 +9,13 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  // Absolute URLs for link previews; falls back to the deployed Vercel URL.
+  // Absolute base for link-preview and canonical URLs. games.madsoul.in is the
+  // canonical domain, so pin it in production regardless of any env var; only
+  // local dev falls back to localhost.
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL ??
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"),
+    process.env.NODE_ENV === "production"
+      ? "https://games.madsoul.in"
+      : (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
   ),
   title: { default: "On the House", template: "%s · On the House" },
   description: "Host the night, settle the chaos. House party games for your crew.",
