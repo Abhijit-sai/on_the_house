@@ -134,6 +134,14 @@ export default function LandingPage() {
           </Link>
         </Button>
         <p className="mt-3 text-center text-xs text-muted">Free to host · your crew joins with a link</p>
+        <p className="mt-6 flex justify-center gap-4 text-xs text-muted">
+          <Link href="/privacy" className="hover:text-cream">
+            Privacy
+          </Link>
+          <Link href="/terms" className="hover:text-cream">
+            Terms
+          </Link>
+        </p>
       </div>
     </main>
   );
