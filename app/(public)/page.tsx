@@ -1,5 +1,7 @@
+import { auth } from "@clerk/nextjs/server";
 import { ArrowRight, Link2, Trophy, Users } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArcadeCarousel, type ArcadeGame } from "@/features/arcade/arcade-carousel";
 
@@ -75,7 +77,16 @@ const promises = [
   },
 ];
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  // A signed-in visitor wants the app, not the marketing page. Production Clerk
+  // sends people to "/" after sign-in by default, so this is what lands them
+  // in the app.
+  const { userId } = await auth();
+
+  if (userId) {
+    redirect("/app/dashboard");
+  }
+
   return (
     <main className="relative min-h-dvh overflow-hidden text-cream">
       <div className="pointer-events-none absolute inset-0 -z-10">
