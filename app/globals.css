@@ -81,21 +81,21 @@ select {
   animation: chip-pop 0.3s ease-out;
 }
 
-@keyframes arcade-scroll {
+/* Dwell timeline under the active arcade card. Its end advances the carousel. */
+@keyframes arcade-progress {
   from {
-    transform: translateX(0);
+    width: 0%;
   }
   to {
-    transform: translateX(-50%);
+    width: 100%;
   }
 }
 
-.arcade-track {
-  animation: arcade-scroll 45s linear infinite;
-}
-
-.group\/track:hover .arcade-track {
-  animation-play-state: paused;
+.arcade-progress {
+  width: 0%;
+  animation-name: arcade-progress;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
 }
 
 @keyframes ambient-drift {
@@ -116,7 +116,7 @@ select {
   .sheet-up,
   .live-pulse,
   .chip-pop,
-  .arcade-track,
+  .arcade-progress,
   .ambient-drift {
     animation: none;
   }
