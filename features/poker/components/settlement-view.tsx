@@ -14,7 +14,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useOptimistic, useState, useTransition } from "react";
 import type { SettlementLine } from "@/db/types/database";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -26,7 +26,7 @@ import { QrSheet } from "@/components/shared/qr-sheet";
 import { closeGame, recordLinePayment, reopenTally } from "@/features/poker/actions";
 import { updatePlayerUpi } from "@/features/players/actions";
 import type { GameDetail, SeatedPlayer } from "@/features/poker/queries";
-import { roundMoney } from "@/features/settlement/calculations";
+import { roundMoney, settlementLineStatus } from "@/features/settlement/calculations";
 import { formatMoney, formatSignedMoney } from "@/lib/format";
 import { upiLink } from "@/lib/upi";
 import { cn } from "@/lib/utils";
@@ -35,6 +35,7 @@ export function SettlementView({ detail }: { detail: GameDetail }) {
   const { game, seats, tallies, batch } = detail;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [closing, startClosing] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [partialLine, setPartialLine] = useState<SettlementLine | null>(null);
   const [partialAmount, setPartialAmount] = useState("");
@@ -44,7 +45,16 @@ export function SettlementView({ detail }: { detail: GameDetail }) {
   const [upiDraft, setUpiDraft] = useState("");
 
   const seatsById = useMemo(() => new Map(seats.map((seat) => [seat.id, seat])), [seats]);
-  const lines = batch?.lines ?? [];
+  // Payments tick over the moment they're tapped; the server confirms behind.
+  const [lines, applyOptimisticPayment] = useOptimistic(
+    batch?.lines ?? [],
+    (current: SettlementLine[], update: { lineId: string; paidAmount: number }) =>
+      current.map((l) =>
+        l.id === update.lineId
+          ? { ...l, paid_amount: update.paidAmount, status: settlementLineStatus(l.amount, update.paidAmount) }
+          : l,
+      ),
+  );
 
   const standings = useMemo(
     () =>
@@ -61,9 +71,11 @@ export function SettlementView({ detail }: { detail: GameDetail }) {
   function markPaid(line: SettlementLine, amount: number) {
     setError(null);
     startTransition(async () => {
+      applyOptimisticPayment({ lineId: line.id, paidAmount: amount });
+
       const result = await recordLinePayment({ gameId: game.id, lineId: line.id, paidAmount: amount });
 
-      if (!result.ok) setError(result.message ?? "Could not record the payment.");
+      if (!result.ok) setError(result.message ?? "Could not record the payment — it was not saved.");
     });
   }
 
@@ -147,7 +159,7 @@ export function SettlementView({ detail }: { detail: GameDetail }) {
           const receiverUpi = to.player.upi_id;
 
           return (
-            <Card key={line.id} className={cn("space-y-3", paid && "opacity-70")}>
+            <Card key={line.id} className={cn("space-y-2.5 p-3", paid && "opacity-60")}>
               <div className="flex items-center gap-2">
                 <PlayerAvatar name={from.player.name} colorKey={from.player.color_key} size="sm" />
                 <span className="min-w-0 flex-1 truncate text-sm font-bold text-white">{from.player.name}</span>
@@ -156,7 +168,7 @@ export function SettlementView({ detail }: { detail: GameDetail }) {
                 <PlayerAvatar name={to.player.name} colorKey={to.player.color_key} size="sm" />
               </div>
               <div className="flex items-center justify-between">
-                <p className="text-2xl font-black tabular-nums text-white">{formatMoney(line.amount)}</p>
+                <p className="text-xl font-black tabular-nums text-white">{formatMoney(line.amount)}</p>
                 {paid ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-3 py-1 text-xs font-bold text-success">
                     <Check className="h-3.5 w-3.5" />
@@ -172,33 +184,31 @@ export function SettlementView({ detail }: { detail: GameDetail }) {
               </div>
 
               {!paid ? (
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" disabled={isPending} onClick={() => markPaid(line, line.amount)}>
+                // One row: the primary action takes the width, the rest are icons.
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    className="h-10 flex-1"
+                    onClick={() => markPaid(line, line.amount)}
+                  >
                     <Check className="h-4 w-4" />
                     Mark paid
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={isPending}
-                    onClick={() => {
-                      setPartialLine(line);
-                      setPartialAmount(line.paid_amount > 0 ? String(line.paid_amount) : "");
-                    }}
-                  >
-                    Partial…
-                  </Button>
                   {receiverUpi ? (
                     <>
-                      <Button size="sm" variant="secondary" asChild>
-                        <a href={upiLink(receiverUpi, to.player.name, remaining, game.name)}>
+                      <Button size="icon" variant="secondary" className="h-10 w-10" asChild>
+                        <a
+                          href={upiLink(receiverUpi, to.player.name, remaining, game.name)}
+                          aria-label={`Pay ${to.player.name} with a UPI app`}
+                        >
                           <Smartphone className="h-4 w-4" />
-                          UPI
                         </a>
                       </Button>
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="secondary"
+                        className="h-10 w-10"
+                        aria-label={`Show UPI QR for ${to.player.name}`}
                         onClick={() =>
                           setQrLine({
                             upiUri: upiLink(receiverUpi, to.player.name, remaining, game.name),
@@ -208,39 +218,53 @@ export function SettlementView({ detail }: { detail: GameDetail }) {
                         }
                       >
                         <QrCode className="h-4 w-4" />
-                        QR
                       </Button>
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="secondary"
+                        className="h-10 w-10"
+                        aria-label={`Copy ${to.player.name}'s UPI ID`}
                         onClick={() => copyText(receiverUpi, `upi-${line.id}`)}
                       >
-                        <Copy className="h-4 w-4" />
-                        {copied === `upi-${line.id}` ? "Copied!" : "Copy UPI"}
+                        {copied === `upi-${line.id}` ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
                       </Button>
                     </>
                   ) : (
                     <>
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="secondary"
+                        className="h-10 w-10"
+                        aria-label="Copy amount"
                         onClick={() => copyText(String(remaining), `amt-${line.id}`)}
                       >
-                        <Copy className="h-4 w-4" />
-                        {copied === `amt-${line.id}` ? "Copied!" : "Copy amount"}
+                        {copied === `amt-${line.id}` ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
                       </Button>
                       <Button
                         size="sm"
                         variant="secondary"
+                        className="h-10 px-3"
                         onClick={() => {
                           setUpiEditSeat(to);
                           setUpiDraft("");
                         }}
                       >
-                        Add UPI for {to.player.name}
+                        + UPI
                       </Button>
                     </>
                   )}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="h-10 px-3"
+                    disabled={isPending}
+                    onClick={() => {
+                      setPartialLine(line);
+                      setPartialAmount(line.paid_amount > 0 ? String(line.paid_amount) : "");
+                    }}
+                  >
+                    Part
+                  </Button>
                 </div>
               ) : null}
             </Card>
@@ -252,21 +276,27 @@ export function SettlementView({ detail }: { detail: GameDetail }) {
         <p className="rounded-2xl border border-red-danger/30 bg-red-danger/10 p-3 text-sm text-red-danger">{error}</p>
       ) : null}
 
-      <div className="sticky bottom-20 z-10 -mx-2 space-y-2 rounded-[24px] border border-border bg-background/95 p-3 shadow-[0_-12px_32px_rgba(0,0,0,0.55)] backdrop-blur">
-        <Button
-          className="h-14 w-full text-base shadow-glow"
-          disabled={!allPaid || isPending}
-          onClick={() =>
-            startTransition(async () => {
-              const result = await closeGame(game.id);
+      {/* Only earns a sticky bar once there is something to do with it. */}
+      {allPaid ? (
+        <div className="static-on-keyboard sticky bottom-20 z-10 -mx-2 rounded-[22px] border border-border bg-background/95 p-2 shadow-[0_-12px_32px_rgba(0,0,0,0.55)] backdrop-blur">
+          <Button
+            className="h-12 w-full text-base shadow-glow"
+            disabled={closing}
+            onClick={() =>
+              startClosing(async () => {
+                const result = await closeGame(game.id);
 
-              if (!result.ok) setError(result.message ?? "Could not close the game.");
-            })
-          }
-        >
-          {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <PartyPopper className="h-5 w-5" />}
-          {allPaid ? "Close the night" : "Close after all payments"}
-        </Button>
+                if (!result.ok) setError(result.message ?? "Could not close the game.");
+              })
+            }
+          >
+            {closing ? <Loader2 className="h-5 w-5 animate-spin" /> : <PartyPopper className="h-5 w-5" />}
+            Close the night
+          </Button>
+        </div>
+      ) : null}
+
+      <div>
         <Button
           variant="ghost"
           className="w-full text-muted"

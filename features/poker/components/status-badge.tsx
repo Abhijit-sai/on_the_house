@@ -17,7 +17,7 @@ export function StatusBadge({ status, className }: { status: GameStatus; classNa
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold",
+        "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-bold",
         config.className,
         className,
       )}

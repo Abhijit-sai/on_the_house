@@ -121,3 +121,12 @@ select {
     animation: none;
   }
 }
+
+/* While typing on a phone, get chrome out of the keyboard's way. */
+html[data-keyboard="open"] .hide-on-keyboard {
+  display: none !important;
+}
+
+html[data-keyboard="open"] .static-on-keyboard {
+  position: static !important;
+}

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentHost } from "@/features/hosts/queries";
-import { listPlayersForCurrentHost } from "@/features/players/queries";
+import { listPlayersByPlayCount } from "@/features/players/queries";
 import { NewGameWizard } from "@/features/poker/components/new-game-wizard";
 
 export default async function NewPokerGamePage() {
@@ -10,7 +10,7 @@ export default async function NewPokerGamePage() {
     redirect("/app/onboarding");
   }
 
-  const players = await listPlayersForCurrentHost();
+  const players = await listPlayersByPlayCount();
 
   return (
     <div className="space-y-6">

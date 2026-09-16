@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentHost } from "@/features/hosts/queries";
-import { listPlayersForCurrentHost } from "@/features/players/queries";
+import { listPlayersByPlayCount } from "@/features/players/queries";
 import { NewRallyForm } from "@/features/rally/components/new-rally-form";
 
 export default async function NewRallyPage() {
@@ -10,7 +10,7 @@ export default async function NewRallyPage() {
     redirect("/app/onboarding");
   }
 
-  const players = await listPlayersForCurrentHost();
+  const players = await listPlayersByPlayCount();
 
   return (
     <div className="space-y-6">

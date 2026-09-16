@@ -1,6 +1,6 @@
 "use client";
 
-import { Crown, Flame, Loader2, Plus } from "lucide-react";
+import { Crown, Flame, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import type { Player } from "@/db/types/database";
@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PlayerAvatar } from "@/components/shared/player-avatar";
+import { PlayerPicker, type CreatePlayerResult, type PickerPlayer } from "@/components/shared/player-picker";
 import { savePlayer } from "@/features/players/actions";
 import { createRally } from "@/features/rally/actions";
 import { addDays, todayISO } from "@/features/rally/engine";
@@ -32,48 +33,44 @@ export function NewRallyForm({ players, hostName }: { players: Player[]; hostNam
   const [endDate, setEndDate] = useState(addDays(todayISO(), 29));
   const [memberIds, setMemberIds] = useState<string[]>([]);
   const [hostPlayerId, setHostPlayerId] = useState<string | null>(null);
-  const [quickName, setQuickName] = useState("");
-  const [quickAddPending, startQuickAdd] = useTransition();
+  // Players created from the picker render immediately, ahead of the refresh.
+  const [extraPlayers, setExtraPlayers] = useState<PickerPlayer[]>([]);
 
-  const playersById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
+  const allPlayers = useMemo(() => {
+    const known = new Set(players.map((p) => p.id));
+    return [...extraPlayers.filter((p) => !known.has(p.id)), ...players];
+  }, [players, extraPlayers]);
 
-  function toggleMember(playerId: string) {
+  const playersById = useMemo(() => new Map(allPlayers.map((p) => [p.id, p])), [allPlayers]);
+
+  /** Apply the picker's selection; auto-crown whoever carries the host's name. */
+  function setMembers(ids: string[]) {
     setError(null);
-    setMemberIds((current) => {
-      if (current.includes(playerId)) {
-        setHostPlayerId((h) => (h === playerId ? null : h));
-        return current.filter((id) => id !== playerId);
-      }
+    const next = ids.slice(0, 20);
+    setMemberIds(next);
 
-      if (current.length >= 20) return current;
+    setHostPlayerId((current) => {
+      if (current && next.includes(current)) return current;
+      if (!hostName) return null;
 
-      // Auto-crown when the host seats a player carrying their own name.
-      const player = playersById.get(playerId);
+      const me = next.find(
+        (id) => playersById.get(id)?.name.trim().toLowerCase() === hostName.trim().toLowerCase(),
+      );
 
-      if (hostName && player && player.name.trim().toLowerCase() === hostName.trim().toLowerCase()) {
-        setHostPlayerId((h) => h ?? playerId);
-      }
-
-      return [...current, playerId];
+      return me ?? null;
     });
   }
 
-  function quickAddPlayer() {
-    const trimmed = quickName.trim();
+  async function createPlayer(playerName: string): Promise<CreatePlayerResult> {
+    const result = await savePlayer({ name: playerName });
 
-    if (!trimmed) return;
-
-    startQuickAdd(async () => {
-      const result = await savePlayer({ name: trimmed });
-
-      if (!result.ok) {
-        setError(result.message ?? "Could not add player.");
-        return;
-      }
-
-      setQuickName("");
+    if (result.ok && result.player) {
+      const created = result.player;
+      setExtraPlayers((current) => [created, ...current]);
       router.refresh();
-    });
+    }
+
+    return result;
   }
 
   function create() {
@@ -155,74 +152,46 @@ export function NewRallyForm({ players, hostName }: { players: Player[]; hostNam
       </Card>
 
       <Card className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="font-bold text-white">Who's in?</h2>
-          <span className="text-xs font-bold text-muted">{memberIds.length}/20</span>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {players.map((player) => {
-            const selected = memberIds.includes(player.id);
-
-            return (
-              <button
-                key={player.id}
-                type="button"
-                onClick={() => toggleMember(player.id)}
-                className={cn(
-                  "flex min-h-11 items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold",
-                  selected ? "border-gold-brand/60 bg-gold-tint text-gold-brand" : "border-border bg-elevated text-cream",
-                )}
-              >
-                <PlayerAvatar name={player.name} colorKey={player.color_key} size="sm" />
-                {player.name}
-              </button>
-            );
-          })}
-          {players.length === 0 ? <p className="text-sm text-muted">No saved players yet — add your first below.</p> : null}
-        </div>
-        <div className="flex gap-2">
-          <Input
-            placeholder="Quick add member…"
-            value={quickName}
-            onChange={(e) => setQuickName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                quickAddPlayer();
-              }
-            }}
-          />
-          <Button type="button" variant="secondary" size="icon" onClick={quickAddPlayer} disabled={quickAddPending}>
-            {quickAddPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
-          </Button>
-        </div>
+        <PlayerPicker
+          label="Who's in?"
+          players={allPlayers}
+          selectedIds={memberIds}
+          onChange={setMembers}
+          onCreatePlayer={createPlayer}
+          max={20}
+        />
 
         {memberIds.length > 0 ? (
           <div className="space-y-2">
-            <p className="text-xs text-muted">Tap the crown on your own seat so you can rally along too.</p>
-            {memberIds.map((playerId) => {
-              const player = playersById.get(playerId);
+            <p className="text-[11px] text-muted">
+              <Crown className="mb-0.5 mr-0.5 inline h-3 w-3" /> marks you, so you can rally along too.
+            </p>
+            <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-elevated">
+              {memberIds.map((playerId) => {
+                const player = playersById.get(playerId);
 
-              if (!player) return null;
+                if (!player) return null;
 
-              return (
-                <div key={playerId} className="flex items-center gap-3 rounded-2xl border border-border bg-elevated p-3">
-                  <PlayerAvatar name={player.name} colorKey={player.color_key} size="sm" />
-                  <span className="flex-1 text-sm font-bold text-white">{player.name}</span>
-                  <button
-                    type="button"
-                    aria-label={hostPlayerId === playerId ? "Unmark as you" : "Mark as you"}
-                    onClick={() => setHostPlayerId((current) => (current === playerId ? null : playerId))}
-                    className={cn(
-                      "flex h-10 w-10 items-center justify-center rounded-full border",
-                      hostPlayerId === playerId ? "border-gold-brand bg-gold-tint text-gold-brand shadow-glow" : "border-border text-muted",
-                    )}
-                  >
-                    <Crown className="h-4 w-4" />
-                  </button>
-                </div>
-              );
-            })}
+                return (
+                  <div key={playerId} className="flex min-h-12 items-center gap-3 px-3 py-1.5">
+                    <PlayerAvatar name={player.name} colorKey={player.color_key} size="sm" />
+                    <span className="min-w-0 flex-1 truncate text-sm font-bold text-white">{player.name}</span>
+                    <button
+                      type="button"
+                      aria-label={hostPlayerId === playerId ? "Unmark as you" : "Mark as you"}
+                      aria-pressed={hostPlayerId === playerId}
+                      onClick={() => setHostPlayerId((current) => (current === playerId ? null : playerId))}
+                      className={cn(
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border",
+                        hostPlayerId === playerId ? "border-gold-brand bg-gold-tint text-gold-brand" : "border-border text-muted",
+                      )}
+                    >
+                      <Crown className="h-4 w-4" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         ) : null}
       </Card>

@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { PlayerAvatar } from "@/components/shared/player-avatar";
+import { PlayerPickerSheet } from "@/components/shared/player-picker";
+import { savePlayer } from "@/features/players/actions";
 import type { RallyJoinRequest } from "@/db/types/database";
 import {
   addRallyMember,
@@ -193,36 +195,28 @@ export function RallyRoom({
         </div>
       </BottomSheet>
 
-      <BottomSheet open={addOpen} onClose={() => setAddOpen(false)} title="Add a member mid-rally">
-        <div className="space-y-4">
-          <p className="text-sm text-muted">
-            They join from today — earlier days don't count against them. Manage your player crew on the Players page.
-          </p>
-          {addablePlayers.length === 0 ? (
-            <p className="rounded-2xl border border-border bg-elevated p-3 text-sm text-muted">
-              Everyone in your address book is already rallying. Add a new player on the Players page first.
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {addablePlayers.map((player) => (
-                <button
-                  key={player.id}
-                  type="button"
-                  disabled={isPending}
-                  onClick={() => {
-                    setAddOpen(false);
-                    run(() => addRallyMember(rally.id, player.id));
-                  }}
-                  className="flex min-h-11 items-center gap-2 rounded-full border border-border bg-elevated px-3 py-1.5 text-sm font-semibold text-cream disabled:opacity-60"
-                >
-                  <PlayerAvatar name={player.name} colorKey={player.colorKey} size="sm" />
-                  {player.name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </BottomSheet>
+      <PlayerPickerSheet
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        title="Add members"
+        description="They join from today — earlier days don't count against their streak."
+        players={addablePlayers.map((p) => ({ id: p.id, name: p.name, color_key: p.colorKey }))}
+        selectedIds={[]}
+        saveLabel="Add to rally"
+        emptyHint="Everyone in your address book is already rallying — type a name above to add someone new."
+        onCreatePlayer={async (name) => savePlayer({ name })}
+        onSave={(ids) =>
+          run(async () => {
+            for (const id of ids) {
+              const result = await addRallyMember(rally.id, id);
+
+              if (!result.ok) return result;
+            }
+
+            return { ok: true };
+          })
+        }
+      />
 
       <BottomSheet
         open={confirmAction !== null}

@@ -10,6 +10,8 @@ import { normalizeName } from "@/lib/utils";
 export type PlayerActionState = {
   ok: boolean;
   message?: string;
+  /** Set when a new player was created, so pickers can select it straight away. */
+  player?: { id: string; name: string; color_key: string | null };
 };
 
 function randomItem<T>(items: readonly T[]) {
@@ -63,18 +65,25 @@ export async function savePlayer(input: unknown): Promise<PlayerActionState> {
       return { ok: false, message: error.message };
     }
   } else {
-    const { error } = await supabase.from("players").insert({
-      host_id: host.id,
-      name: parsed.data.name.trim(),
-      name_normalized: nameNormalized,
-      upi_id: upiId,
-      avatar_key: randomItem(avatarKeys),
-      color_key: randomItem(colorKeys),
-    });
+    const { data: created, error } = await supabase
+      .from("players")
+      .insert({
+        host_id: host.id,
+        name: parsed.data.name.trim(),
+        name_normalized: nameNormalized,
+        upi_id: upiId,
+        avatar_key: randomItem(avatarKeys),
+        color_key: randomItem(colorKeys),
+      })
+      .select("id, name, color_key")
+      .single();
 
     if (error) {
       return { ok: false, message: error.code === "23505" ? "This player already exists." : error.message };
     }
+
+    revalidatePath("/app/players");
+    return { ok: true, player: created };
   }
 
   revalidatePath("/app/players");

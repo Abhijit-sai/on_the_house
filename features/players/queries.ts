@@ -50,3 +50,47 @@ export async function listPlayersForCurrentHost() {
 
   return data;
 }
+
+/**
+ * The address book ordered by how often each person turns up (poker seats +
+ * rally memberships), so pickers can offer the regulars first.
+ */
+export async function listPlayersByPlayCount() {
+  const host = await requireCurrentHost();
+  const supabase = createSupabaseAdminClient();
+
+  const [playersRes, gamesRes, ralliesRes] = await Promise.all([
+    supabase.from("players").select("*").eq("host_id", host.id),
+    supabase.from("games").select("id").eq("host_id", host.id),
+    supabase.from("rallies").select("id").eq("host_id", host.id),
+  ]);
+
+  if (playersRes.error) throw new Error(playersRes.error.message);
+  if (gamesRes.error) throw new Error(gamesRes.error.message);
+  if (ralliesRes.error) throw new Error(ralliesRes.error.message);
+
+  const gameIds = gamesRes.data.map((g) => g.id);
+  const rallyIds = ralliesRes.data.map((r) => r.id);
+
+  const [seatsRes, membersRes] = await Promise.all([
+    gameIds.length > 0
+      ? supabase.from("game_players").select("player_id").in("game_id", gameIds)
+      : Promise.resolve({ data: [] as { player_id: string }[], error: null }),
+    rallyIds.length > 0
+      ? supabase.from("rally_members").select("player_id").in("rally_id", rallyIds)
+      : Promise.resolve({ data: [] as { player_id: string }[], error: null }),
+  ]);
+
+  if (seatsRes.error) throw new Error(seatsRes.error.message);
+  if (membersRes.error) throw new Error(membersRes.error.message);
+
+  const counts = new Map<string, number>();
+
+  for (const row of [...(seatsRes.data ?? []), ...(membersRes.data ?? [])]) {
+    counts.set(row.player_id, (counts.get(row.player_id) ?? 0) + 1);
+  }
+
+  return [...playersRes.data].sort(
+    (a, b) => (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0) || a.name.localeCompare(b.name),
+  );
+}

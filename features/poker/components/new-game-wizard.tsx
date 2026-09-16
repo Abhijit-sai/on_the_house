@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crown, Loader2, Plus, Shuffle, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crown, Loader2, Shuffle, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import type { Player } from "@/db/types/database";
@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PlayerAvatar } from "@/components/shared/player-avatar";
+import { PlayerPicker, type CreatePlayerResult, type PickerPlayer } from "@/components/shared/player-picker";
 import { createPokerGame } from "@/features/poker/actions";
 import { savePlayer } from "@/features/players/actions";
 
@@ -38,10 +39,17 @@ export function NewGameWizard({ players, hostName }: { players: Player[]; hostNa
   const [allowRebuys, setAllowRebuys] = useState(true);
 
   const [seats, setSeats] = useState<Seat[]>([]);
-  const [quickName, setQuickName] = useState("");
-  const [quickAddPending, startQuickAdd] = useTransition();
+  // Most seats never hand over cash, so the field stays folded until asked for.
+  const [cashOpen, setCashOpen] = useState<Set<string>>(new Set());
+  // Players created from the picker render immediately, ahead of the refresh.
+  const [extraPlayers, setExtraPlayers] = useState<PickerPlayer[]>([]);
 
-  const playersById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
+  const allPlayers = useMemo(() => {
+    const known = new Set(players.map((p) => p.id));
+    return [...extraPlayers.filter((p) => !known.has(p.id)), ...players];
+  }, [players, extraPlayers]);
+
+  const playersById = useMemo(() => new Map(allPlayers.map((p) => [p.id, p])), [allPlayers]);
 
   const ratio = {
     money: Number(ratioMoney) || 0,
@@ -57,26 +65,45 @@ export function NewGameWizard({ players, hostName }: { players: Player[]; hostNa
   const maxBuyInCoins = maxBuyIn ? toCoins(Number(maxBuyIn)) : null;
   const minConvertsCleanly = Number(minBuyIn) > 0 && Number.isInteger(minBuyInCoins);
 
-  function toggleSeat(playerId: string) {
+  /** Apply the picker's selection, keeping seat order and details for anyone already seated. */
+  function setSeatedPlayers(ids: string[]) {
     setError(null);
     setSeats((current) => {
-      if (current.some((seat) => seat.playerId === playerId)) {
-        return current.filter((seat) => seat.playerId !== playerId);
-      }
+      const kept = current.filter((seat) => ids.includes(seat.playerId));
+      let hostTaken = kept.some((seat) => seat.isHostPlayer);
 
-      if (current.length >= 9) return current;
+      const added = ids
+        .filter((id) => !current.some((seat) => seat.playerId === id))
+        .slice(0, Math.max(9 - kept.length, 0))
+        .map((id) => {
+          // Auto-crown the player carrying the host's own name, so the seat is
+          // never silently missed (it gates host settlement and cash with you).
+          const player = playersById.get(id);
+          const isMe =
+            !hostTaken &&
+            Boolean(hostName) &&
+            Boolean(player) &&
+            player!.name.trim().toLowerCase() === hostName!.trim().toLowerCase();
 
-      // Auto-crown the player carrying the host's own name, so the seat is
-      // never silently missed (it gates host settlement and advances).
-      const player = playersById.get(playerId);
-      const isMe =
-        Boolean(hostName) &&
-        Boolean(player) &&
-        player!.name.trim().toLowerCase() === hostName!.trim().toLowerCase() &&
-        !current.some((seat) => seat.isHostPlayer);
+          if (isMe) hostTaken = true;
 
-      return [...current, { playerId, isHostPlayer: isMe, advanceMoney: "" }];
+          return { playerId: id, isHostPlayer: isMe, advanceMoney: "" };
+        });
+
+      return [...kept, ...added];
     });
+  }
+
+  async function createPlayer(playerName: string): Promise<CreatePlayerResult> {
+    const result = await savePlayer({ name: playerName });
+
+    if (result.ok && result.player) {
+      const created = result.player;
+      setExtraPlayers((current) => [created, ...current]);
+      router.refresh();
+    }
+
+    return result;
   }
 
   function setHostSeat(playerId: string) {
@@ -111,24 +138,6 @@ export function NewGameWizard({ players, hostName }: { players: Player[]; hostNa
       }
 
       return next;
-    });
-  }
-
-  function quickAddPlayer() {
-    const trimmed = quickName.trim();
-
-    if (!trimmed) return;
-
-    startQuickAdd(async () => {
-      const result = await savePlayer({ name: trimmed });
-
-      if (!result.ok) {
-        setError(result.message ?? "Could not add player.");
-        return;
-      }
-
-      setQuickName("");
-      router.refresh();
     });
   }
 
@@ -316,103 +325,75 @@ export function NewGameWizard({ players, hostName }: { players: Player[]; hostNa
 
       {step === 1 ? (
         <div className="space-y-4">
-          <Card className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="font-bold text-white">Who's playing?</h2>
-              <span className="text-xs font-bold text-muted">{seats.length}/9 seated</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {players.map((player) => {
-                const seated = seats.some((seat) => seat.playerId === player.id);
-
-                return (
-                  <button
-                    key={player.id}
-                    type="button"
-                    onClick={() => toggleSeat(player.id)}
-                    className={cn(
-                      "flex min-h-11 items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold transition",
-                      seated
-                        ? "border-gold-brand/60 bg-gold-tint text-gold-brand"
-                        : "border-border bg-elevated text-cream",
-                    )}
-                  >
-                    <PlayerAvatar name={player.name} colorKey={player.color_key} size="sm" />
-                    {player.name}
-                  </button>
-                );
-              })}
-              {players.length === 0 ? (
-                <p className="text-sm text-muted">No saved players yet. Add your first one below.</p>
-              ) : null}
-            </div>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Quick add player…"
-                value={quickName}
-                onChange={(e) => setQuickName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    quickAddPlayer();
-                  }
-                }}
-              />
-              <Button type="button" variant="secondary" size="icon" onClick={quickAddPlayer} disabled={quickAddPending}>
-                {quickAddPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
-              </Button>
-            </div>
+          <Card>
+            <PlayerPicker
+              label="Who's playing?"
+              players={allPlayers}
+              selectedIds={seats.map((seat) => seat.playerId)}
+              onChange={setSeatedPlayers}
+              onCreatePlayer={createPlayer}
+              max={9}
+            />
           </Card>
 
           {seats.length > 0 ? (
-            <Card className="space-y-3">
-              <h2 className="font-bold text-white">Seated players</h2>
-              <p className="text-xs text-muted">
-                Tap the crown to mark your own seat.
-              </p>
-              <p className="rounded-2xl border border-border bg-elevated px-3 py-2 text-xs leading-5 text-muted">
-                <span className="font-bold text-cream">Cash with you</span> — money a player handed you before the
-                game (not a buy-in, and it issues no chips). It's held against what they owe, so at settlement they
-                pay that much less, or get it back if they finish up.
-              </p>
-              <div className="space-y-2">
+            <Card className="space-y-2">
+              <div className="flex items-baseline justify-between gap-2">
+                <h2 className="font-bold text-white">Seated</h2>
+                <p className="text-[11px] text-muted">
+                  <Crown className="mb-0.5 mr-0.5 inline h-3 w-3" /> = you · ₹ = cash they gave you up front
+                </p>
+              </div>
+              <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-elevated">
                 {seats.map((seat) => {
                   const player = playersById.get(seat.playerId);
 
                   if (!player) return null;
 
+                  const showCash = cashOpen.has(seat.playerId) || seat.advanceMoney !== "";
+
                   return (
-                    <div key={seat.playerId} className="chip-pop rounded-2xl border border-border bg-elevated p-3">
-                      <div className="flex items-center gap-3">
-                        <PlayerAvatar name={player.name} colorKey={player.color_key} size="sm" />
-                        <span className="flex-1 text-sm font-bold text-white">{player.name}</span>
+                    <div key={seat.playerId} className="flex min-h-12 items-center gap-2 px-3 py-1.5">
+                      <PlayerAvatar name={player.name} colorKey={player.color_key} size="sm" />
+                      <span className="min-w-0 flex-1 truncate text-sm font-bold text-white">{player.name}</span>
+                      {showCash ? (
+                        <div className="relative w-24 shrink-0">
+                          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted">₹</span>
+                          <Input
+                            id={`advance-${seat.playerId}`}
+                            aria-label={`Cash ${player.name} handed you up front`}
+                            inputMode="numeric"
+                            placeholder="0"
+                            autoFocus={seat.advanceMoney === ""}
+                            className="h-9 pl-6 text-right text-sm tabular-nums"
+                            value={seat.advanceMoney}
+                            onChange={(e) => setAdvance(seat.playerId, e.target.value)}
+                          />
+                        </div>
+                      ) : (
                         <button
                           type="button"
-                          aria-label={seat.isHostPlayer ? "Unmark as host" : "Mark as your seat"}
-                          onClick={() => setHostSeat(seat.playerId)}
-                          className={cn(
-                            "flex h-10 w-10 items-center justify-center rounded-full border",
-                            seat.isHostPlayer
-                              ? "border-gold-brand bg-gold-tint text-gold-brand shadow-glow"
-                              : "border-border text-muted",
-                          )}
+                          aria-label={`Record cash ${player.name} handed you up front`}
+                          onClick={() => setCashOpen((current) => new Set(current).add(seat.playerId))}
+                          className="flex h-9 shrink-0 items-center rounded-full border border-border px-2.5 text-xs font-bold text-muted"
                         >
-                          <Crown className="h-4 w-4" />
+                          + ₹
                         </button>
-                      </div>
-                      <div className="mt-2 flex items-center gap-2">
-                        <Label htmlFor={`advance-${seat.playerId}`} className="shrink-0 text-xs text-muted">
-                          Cash with you ₹
-                        </Label>
-                        <Input
-                          id={`advance-${seat.playerId}`}
-                          inputMode="numeric"
-                          placeholder="0"
-                          className="h-10"
-                          value={seat.advanceMoney}
-                          onChange={(e) => setAdvance(seat.playerId, e.target.value)}
-                        />
-                      </div>
+                      )}
+                      <button
+                        type="button"
+                        aria-label={seat.isHostPlayer ? "Unmark as your seat" : "Mark as your seat"}
+                        aria-pressed={seat.isHostPlayer}
+                        onClick={() => setHostSeat(seat.playerId)}
+                        className={cn(
+                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border",
+                          seat.isHostPlayer
+                            ? "border-gold-brand bg-gold-tint text-gold-brand"
+                            : "border-border text-muted",
+                        )}
+                      >
+                        <Crown className="h-4 w-4" />
+                      </button>
                     </div>
                   );
                 })}

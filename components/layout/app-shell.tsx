@@ -1,6 +1,7 @@
 import { UserButton } from "@clerk/nextjs";
 import { ReactNode } from "react";
 import { GameSwitcher } from "@/components/layout/game-switcher";
+import { KeyboardAware } from "@/components/layout/keyboard-aware";
 import { BottomWorldNav, SidebarWorldCta, SidebarWorldNav } from "@/components/layout/world-nav";
 import { getCurrentHost } from "@/features/hosts/queries";
 
@@ -9,6 +10,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="mx-auto min-h-dvh w-full max-w-md bg-background text-cream lg:flex lg:max-w-6xl lg:gap-8 lg:px-6">
+      <KeyboardAware />
       {/* Desktop sidebar */}
       <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-dvh lg:w-60 lg:shrink-0 lg:flex-col lg:gap-2 lg:py-8">
         <div className="mb-4 px-3">
@@ -40,11 +42,11 @@ export async function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 px-4 pb-28 pt-4 lg:px-0 lg:pb-12 lg:pt-8">{children}</main>
+        <main className="flex-1 px-4 pb-32 pt-4 lg:px-0 lg:pb-12 lg:pt-8">{children}</main>
       </div>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-border bg-background/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden">
+      <nav className="hide-on-keyboard fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-border bg-background/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden">
         <BottomWorldNav />
       </nav>
     </div>

@@ -12,7 +12,7 @@ export function RallyStatusBadge({ status, className }: { status: RallyStatus; c
   const c = config[status];
 
   return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold", c.className, className)}>
+    <span className={cn("inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-bold", c.className, className)}>
       {c.pulse ? <span className="live-pulse h-2 w-2 rounded-full bg-success" /> : null}
       {c.label}
     </span>

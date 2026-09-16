@@ -1,8 +1,8 @@
 "use client";
 
 import { Check, Coins, Crown, Flag, Loader2, Minus, Pause, Play, Plus, Trash2 } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
-import type { BuyInPaymentStatus } from "@/db/types/database";
+import { useMemo, useOptimistic, useState, useTransition } from "react";
+import type { BuyInPaymentStatus, PokerBuyIn } from "@/db/types/database";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,9 +32,16 @@ const paymentStatusOptions: { value: BuyInPaymentStatus; label: string }[] = [
 ];
 
 export function LiveView({ detail }: { detail: GameDetail }) {
-  const { game, config, seats, buyIns } = detail;
+  const { game, config, seats } = detail;
   const paused = game.status === "paused";
   const [isPending, startTransition] = useTransition();
+  // Buy-ins appear the instant the host confirms; the server catches up behind.
+  // If the save fails, React drops the optimistic rows and we surface the error.
+  const [buyInPending, startBuyIn] = useTransition();
+  const [buyIns, addOptimisticBuyIns] = useOptimistic(
+    detail.buyIns,
+    (current: PokerBuyIn[], added: PokerBuyIn[]) => [...current, ...added],
+  );
   const [error, setError] = useState<string | null>(null);
 
   const [buyInSheetOpen, setBuyInSheetOpen] = useState(false);
@@ -93,20 +100,44 @@ export function LiveView({ detail }: { detail: GameDetail }) {
       return;
     }
 
-    startTransition(async () => {
+    const seatIds = roundSeatIds;
+    const money = amountNumber;
+    const coins = amountCoins;
+    const status = paymentStatus;
+    const now = new Date().toISOString();
+
+    // Close first (an urgent update), so the host is back at the table at once.
+    setError(null);
+    setBuyInSheetOpen(false);
+
+    startBuyIn(async () => {
+      addOptimisticBuyIns(
+        seatIds.map((seatId, index) => ({
+          id: `optimistic-${now}-${index}`,
+          game_id: game.id,
+          game_player_id: seatId,
+          money_amount: money,
+          coin_amount: coins,
+          payment_status: status,
+          note: null,
+          created_by_host_id: "",
+          created_at: now,
+          updated_at: now,
+          deleted_at: null,
+          reversal_reason: null,
+        })),
+      );
+
       const result = await addBuyIn({
         gameId: game.id,
-        gamePlayerIds: roundSeatIds,
-        moneyAmount: amountNumber,
-        paymentStatus,
+        gamePlayerIds: seatIds,
+        moneyAmount: money,
+        paymentStatus: status,
       });
 
       if (!result.ok) {
-        setError(result.message ?? "Could not add the buy-in.");
-        return;
+        setError(result.message ?? "Could not add the buy-in — nothing was saved.");
       }
-
-      setBuyInSheetOpen(false);
     });
   }
 
@@ -161,8 +192,14 @@ export function LiveView({ detail }: { detail: GameDetail }) {
             <p className="text-xl font-black tabular-nums text-gold-brand">{formatCoins(totals.coins)}</p>
           </div>
         </div>
-        <p className="text-xs text-muted">
+        <p className="flex items-center gap-1.5 text-xs text-muted">
           {totals.count} buy-in{totals.count === 1 ? "" : "s"} · {seats.length} players
+          {buyInPending ? (
+            <span className="inline-flex items-center gap-1 text-gold-brand">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              saving
+            </span>
+          ) : null}
         </p>
       </Card>
 
@@ -216,7 +253,7 @@ export function LiveView({ detail }: { detail: GameDetail }) {
                 <button
                   type="button"
                   aria-label={`Add a buy-in for ${seat.player.name}`}
-                  disabled={paused || isPending}
+                  disabled={paused}
                   onClick={(e) => {
                     e.stopPropagation();
                     openBuyInSheet(seat.id);
@@ -252,7 +289,7 @@ export function LiveView({ detail }: { detail: GameDetail }) {
         </Button>
       </div>
 
-      <div className="sticky bottom-20 z-10 -mx-2 rounded-[24px] border border-border bg-background/95 p-3 shadow-[0_-12px_32px_rgba(0,0,0,0.55)] backdrop-blur">
+      <div className="static-on-keyboard sticky bottom-20 z-10 -mx-2 rounded-[24px] border border-border bg-background/95 p-3 shadow-[0_-12px_32px_rgba(0,0,0,0.55)] backdrop-blur">
         <Button
           className="h-14 w-full text-base shadow-glow"
           size="lg"
@@ -428,10 +465,10 @@ export function LiveView({ detail }: { detail: GameDetail }) {
 
           <Button
             className="h-13 w-full"
-            disabled={isPending || !amountIsWhole || roundSeatIds.length === 0}
+            disabled={!amountIsWhole || roundSeatIds.length === 0}
             onClick={submitBuyIn}
           >
-            {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
+            <Check className="h-5 w-5" />
             {focusedSeat
               ? `Add ${formatMoney(amountNumber)} to ${focusedSeat.player.name}`
               : `Confirm ${roundSeatIds.length} buy-in${roundSeatIds.length === 1 ? "" : "s"}`}
@@ -459,7 +496,7 @@ export function LiveView({ detail }: { detail: GameDetail }) {
                         <p className="text-xs text-muted">{formatCoins(buyIn.coin_amount)} coins</p>
                         <button
                           type="button"
-                          disabled={isPending}
+                          disabled={isPending || buyIn.id.startsWith("optimistic-")}
                           onClick={() =>
                             togglePayment(buyIn.id, buyIn.payment_status === "paid" ? "unpaid" : "paid")
                           }
@@ -478,7 +515,7 @@ export function LiveView({ detail }: { detail: GameDetail }) {
                         size="icon"
                         className="h-10 w-10 text-red-danger"
                         aria-label="Reverse buy-in"
-                        disabled={isPending}
+                        disabled={isPending || buyIn.id.startsWith("optimistic-")}
                         onClick={() => reverseBuyIn(buyIn.id)}
                       >
                         <Trash2 className="h-4 w-4" />
