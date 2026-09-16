@@ -2,6 +2,7 @@
 
 import { nanoid } from "nanoid";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import type { Game, GameStatus } from "@/db/types/database";
 import { requireCurrentHost } from "@/features/hosts/queries";
 import {
@@ -54,6 +55,10 @@ async function requireOwnedGame(gameId: string, allowedStatuses?: GameStatus[]) 
   return { host, supabase, game };
 }
 
+/**
+ * Audit trail. Written after the response is sent so the host never waits on
+ * a log line.
+ */
 async function logEvent(
   supabase: ReturnType<typeof createSupabaseAdminClient>,
   gameId: string,
@@ -61,11 +66,13 @@ async function logEvent(
   eventType: string,
   payload?: Record<string, unknown>,
 ) {
-  await supabase.from("game_events").insert({
-    game_id: gameId,
-    host_id: hostId,
-    event_type: eventType,
-    event_payload: payload ? JSON.parse(JSON.stringify(payload)) : null,
+  after(async () => {
+    await supabase.from("game_events").insert({
+      game_id: gameId,
+      host_id: hostId,
+      event_type: eventType,
+      event_payload: payload ? JSON.parse(JSON.stringify(payload)) : null,
+    });
   });
 }
 
@@ -250,23 +257,28 @@ export async function addBuyIn(input: unknown): Promise<GameActionState> {
   try {
     const { host, supabase, game } = await requireOwnedGame(parsed.data.gameId, ["live"]);
 
-    const { data: config, error: configError } = await supabase
-      .from("poker_game_configs")
-      .select("*")
-      .eq("game_id", game.id)
-      .single();
-
-    if (configError) return fail(configError.message);
-
     // Every seat must belong to this game — never trust client-supplied ids.
     const seatIds = [...new Set(parsed.data.gamePlayerIds)];
-    const { data: seats } = await supabase
-      .from("game_players")
-      .select("id")
-      .eq("game_id", game.id)
-      .in("id", seatIds);
 
-    if (!seats || seats.length !== seatIds.length) {
+    // Independent lookups: run them together instead of one after another.
+    const [configRes, seatsRes, existingRes] = await Promise.all([
+      supabase.from("poker_game_configs").select("*").eq("game_id", game.id).single(),
+      supabase.from("game_players").select("id").eq("game_id", game.id).in("id", seatIds),
+      supabase
+        .from("poker_buy_ins")
+        .select("game_player_id, coin_amount")
+        .eq("game_id", game.id)
+        .in("game_player_id", seatIds)
+        .is("deleted_at", null),
+    ]);
+
+    if (configRes.error) return fail(configRes.error.message);
+    if (existingRes.error) return fail(existingRes.error.message);
+
+    const config = configRes.data;
+    const existing = existingRes.data;
+
+    if (!seatsRes.data || seatsRes.data.length !== seatIds.length) {
       return fail("Someone in that round is not seated at this table.");
     }
 
@@ -282,15 +294,6 @@ export async function addBuyIn(input: unknown): Promise<GameActionState> {
     if (coinAmount < config.min_buy_in_coins) {
       return fail(`Minimum buy-in is ${config.min_buy_in_coins} coins.`);
     }
-
-    const { data: existing, error: existingError } = await supabase
-      .from("poker_buy_ins")
-      .select("game_player_id, coin_amount")
-      .eq("game_id", game.id)
-      .in("game_player_id", seatIds)
-      .is("deleted_at", null);
-
-    if (existingError) return fail(existingError.message);
 
     for (const seatId of seatIds) {
       const own = existing.filter((b) => b.game_player_id === seatId);

@@ -1,7 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
+import { cache } from "react";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
-export async function getCurrentHost() {
+// The app shell, the page and the data queries all ask for the host on the
+// same request. cache() makes that one database round trip instead of three.
+export const getCurrentHost = cache(async () => {
   const { userId } = await auth();
 
   if (!userId) {
@@ -16,7 +19,7 @@ export async function getCurrentHost() {
   }
 
   return data;
-}
+});
 
 export async function requireCurrentHost() {
   const host = await getCurrentHost();
