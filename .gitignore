@@ -15,3 +15,4 @@ coverage
 
 # source design assets (copies live in public/games)
 /Assets/
+metrics.json

@@ -1,6 +1,25 @@
 # On the House — Project Summary
 
-## 1. Current Project State
+> **LAUNCHED TO PRODUCTION 2026-09-17** at **games.madsoul.in**. See §0 below for the current live state; the older sections (§2 onward) are retained as build history.
+
+## 0. Live Production State (2026-09-17)
+On the House is **live and public at https://games.madsoul.in** with production Clerk auth and the user's real game data reconnected.
+
+- **Hosting:** Vercel, GitHub `Abhijit-sai/on_the_house` → auto-deploy on push to `main`. Functions pinned to **hnd1 (Tokyo)** via `vercel.json` to co-locate with the Supabase DB (perf fix — see §perf below).
+- **Auth:** Clerk **production** instance on custom domain (FAPI `clerk.games.madsoul.in`, `pk_live` decodes to that host). Google OAuth connected & published (no 100-user cap, no `accounts.dev` branding). `ClerkProvider` pins `signInUrl="/sign-in" signUpUrl="/sign-up"`. Signed-in visitors to the marketing landing page are redirected into `/app/dashboard` (fixes the post-sign-in "lands on homepage" bug).
+- **DB:** Supabase project `zmoswepllrzsxenrsbww` (ap-northeast-1 / Tokyo). All migrations applied. Host-based data model: `hosts.clerk_user_id` (unique) links the Clerk identity; games/players/rallies FK to `hosts.id`.
+- **Branding / link previews:** `app/icon.svg` (house+spade favicon, gold #F5B942 on #070707), `app/apple-icon.tsx` (180×180 PNG via next/og), `app/opengraph-image.tsx` (1200×630 card), shared logo data-URI in `features/branding/logo.ts`. `metadataBase` pinned to `https://games.madsoul.in` in production.
+- **Legal:** `app/(public)/privacy` and `app/(public)/terms` (contact madsoul1100@gmail.com), linked from the landing footer.
+- **Data migration DONE & verified:** production Clerk minted new user IDs, orphaning the dev-account data. Reconnected via scratchpad scripts (NOT in repo): dev→prod reconnect by email, then consolidated `abhijit.siddabuthuni@gmail.com` **into** `abhijit.sai09@gmail.com` (prod id `user_3JPYve79g4UhAotzmD8j1ur7evF`). Final verified state on that account: **11 games (8 closed), 21 players, 3 rallies**, 0 orphaned seats, zero-sum intact across all closed games, consolidated 18-row lifetime leaderboard (Rahil +₹9,355 top, Abhijit −₹10,600 bottom). Duplicate players merged by name so leaderboard history combines.
+
+**Perf fix (2026-09-16):** app was slow because Vercel functions ran in iad1 (Washington) while the DB is in Tokyo. Fixed with `vercel.json` `"regions": ["hnd1"]`, `getCurrentHost` in React `cache()`, poker audit logs via `after()`, optimistic UI (`useOptimistic`) for buy-ins and mark-paid.
+
+**Open operational items (flagged, NOT yet approved by user):**
+- Supabase free tier **pauses after ~7 days idle** — has crashed the app before; consider Supabase Pro (~$25/mo) or a graceful "waking up" screen before/around a traffic spike.
+- Rally proof photos stored full-size (up to 5MB) — add client-side compression before upload.
+- Neel's account: still only on dev, but it holds **no data**, so nothing to migrate unless/until he signs in on production.
+
+## 1. Current Project State (build history — superseded by §0)
 The repo contains a working Next.js App Router app for On the House with all WBS phases 0–8 implemented (minus live-database verification): the complete host Poker Night flow, public read-only player view at `/g/[token]`, UPI conveniences (deep link, QR, copy, add-UPI-during-settlement), and shareable 1080×1920 canvas result cards. Phase 9 is partially done (theme, avatars, motion; no 3D/physics). The settlement engine has a 22-test vitest suite covering all required cases from docs/06.
 
 The app typechecks, builds, and tests green. The repo is a git repository (main branch). Runtime use requires real Clerk and Supabase environment variables plus both migrations applied to Supabase — the user has explicitly deferred DB/login setup until the build is ready.
@@ -70,12 +89,13 @@ What was not completed:
 - Dashboard: live/draft/pending/recent sections, real counts. History: in-progress + finished lists.
 
 ## 7. Pending Tasks
-- [ ] Add real Clerk + Supabase env vars, apply both migrations, run the full flow end to end (THE gating step).
+Env vars, migrations, deployment, and Vercel are all DONE (see §0 — launched 2026-09-17). Remaining:
+- [ ] Supabase idle-pause mitigation: Supabase Pro or a "waking up" screen (flagged, awaiting user go-ahead).
+- [ ] Rally proof-photo client-side compression before upload.
 - [ ] Generate Supabase TypeScript types to replace hand-authored ones.
-- [ ] Vercel deployment.
 - [ ] Buy-in edit-in-place (currently reverse + re-add).
 - [ ] Drag-and-drop seating; poker-table visual layout; 3D/physics polish.
-- [ ] Review npm audit advisories (8 reported: 1 low, 3 moderate, 4 high); verify lint setup for Next 16.
+- [ ] Review npm audit advisories; verify lint setup for Next 16.
 
 ## 8. Known Issues / Bugs
 - End-to-end flows unverified against a live database (no env vars).
@@ -91,7 +111,8 @@ What was not completed:
 ## 10. Next Recommended Step
 Configure Clerk + Supabase env vars, apply both migrations, then run the full flow against the live database: onboarding → add players → create game with advances → buy-ins → end → tally → settle → close.
 
-## 11. Environment Variables Needed
-- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
+## 11. Environment Variables
+Configured in **Vercel** (production values live there, NOT in `.env.local`; never paste `sk_live`/Client Secret into chat, files, or `.env.example`; secret keys are Secret/Config type, never `NEXT_PUBLIC`).
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (`pk_live`, Config), `CLERK_SECRET_KEY` (`sk_live`, Secret)
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-- `NEXT_PUBLIC_APP_URL`
+- `NEXT_PUBLIC_APP_URL` (prod link-preview base is pinned to `https://games.madsoul.in` in code regardless)
