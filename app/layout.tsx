@@ -1,4 +1,5 @@
 import { ClerkProvider } from "@clerk/nextjs";
+import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
@@ -42,6 +43,7 @@ export default function RootLayout({
       <html lang="en" className="dark" suppressHydrationWarning>
         <body className={`${geist.variable} font-sans antialiased`} suppressHydrationWarning>
           {children}
+          <Analytics />
         </body>
       </html>
     </ClerkProvider>

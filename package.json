@@ -16,6 +16,7 @@
     "@radix-ui/react-label": "latest",
     "@radix-ui/react-slot": "latest",
     "@supabase/supabase-js": "latest",
+    "@vercel/analytics": "^2.0.1",
     "class-variance-authority": "latest",
     "clsx": "latest",
     "date-fns": "latest",
