@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, Crown, Loader2, Scale, Wallet } from "lucide-react";
+import { ArrowLeft, Check, Crown, Loader2, Scale, Wallet, Wand2 } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import type { SettlementMode } from "@/db/types/database";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,22 @@ export function TallyView({ detail }: { detail: GameDetail }) {
     seats.map((seat) => Number(counts[seat.id]) || 0),
   );
   const canSubmit = allEntered && validation.matches;
+
+  // Fast-count helpers: chips must sum to what was issued, so the app can always
+  // work out the last stack for you. Count everyone but one, tap once, it balances.
+  const enteredSum = seats.reduce((sum, seat) => sum + (Number(counts[seat.id]) || 0), 0);
+  const remaining = totals.coins - enteredSum;
+  const blankSeats = seats.filter((seat) => (counts[seat.id] ?? "") === "");
+  const lastBlank = blankSeats.length === 1 ? blankSeats[0] : null;
+
+  /** Set one seat to whatever it takes to make the table balance. */
+  function giveRest(seatId: string) {
+    const others = seats.reduce(
+      (sum, seat) => (seat.id === seatId ? sum : sum + (Number(counts[seat.id]) || 0)),
+      0,
+    );
+    setCounts((c) => ({ ...c, [seatId]: String(Math.max(0, totals.coins - others)) }));
+  }
 
   const directDisabled = hasAdvances && !hostSeat;
   const hostDisabled = !hostSeat;
@@ -104,7 +120,30 @@ export function TallyView({ detail }: { detail: GameDetail }) {
             Perfect tally. Ready to settle.
           </p>
         ) : null}
+        {!allEntered ? (
+          <p className="text-sm text-muted">
+            {remaining > 0
+              ? `${formatCoins(remaining)} coins still to assign`
+              : remaining < 0
+                ? `${formatCoins(Math.abs(remaining))} coins over — check the counts`
+                : "All coins assigned — fill the rest with 0"}
+            {blankSeats.length > 0
+              ? ` · ${blankSeats.length} player${blankSeats.length === 1 ? "" : "s"} left`
+              : ""}
+          </p>
+        ) : null}
       </Card>
+
+      {lastBlank && remaining >= 0 ? (
+        <button
+          type="button"
+          onClick={() => giveRest(lastBlank.id)}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-gold-brand/50 bg-gold-tint p-3 text-sm font-bold text-gold-brand active:scale-[0.99]"
+        >
+          <Wand2 className="h-4 w-4" />
+          Give the last {formatCoins(remaining)} coins to {lastBlank.player.name}
+        </button>
+      ) : null}
 
       <div className="space-y-2">
         {seats.map((seat) => {
@@ -120,11 +159,22 @@ export function TallyView({ detail }: { detail: GameDetail }) {
                 </p>
                 <p className="text-xs text-muted">Bought {formatCoins(totalsForSeat.coins)} coins</p>
               </div>
+              {remaining > 0 ? (
+                <button
+                  type="button"
+                  aria-label={`Give the remaining ${remaining} coins to ${seat.player.name}`}
+                  onClick={() => giveRest(seat.id)}
+                  className="flex h-12 shrink-0 items-center gap-1 rounded-2xl border border-border bg-elevated px-2.5 text-xs font-bold text-gold-brand active:scale-95"
+                >
+                  <Wand2 className="h-3.5 w-3.5" />
+                  rest
+                </button>
+              ) : null}
               <Input
                 aria-label={`Final chips for ${seat.player.name}`}
                 inputMode="numeric"
                 placeholder="0"
-                className="h-12 w-28 text-right text-lg font-black tabular-nums"
+                className="h-12 w-24 text-right text-lg font-black tabular-nums"
                 value={counts[seat.id] ?? ""}
                 onChange={(e) => setCounts((c) => ({ ...c, [seat.id]: e.target.value }))}
               />

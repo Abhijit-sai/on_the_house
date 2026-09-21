@@ -6,11 +6,12 @@ import { useMemo, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PlayerAvatar } from "@/components/shared/player-avatar";
+import { Confetti } from "@/components/shared/confetti";
 import { reopenGame } from "@/features/poker/actions";
 import { ShareCardButton } from "@/features/poker/components/share-card-button";
 import type { GameDetail, SeatedPlayer } from "@/features/poker/queries";
 import { formatMoney, formatSignedMoney } from "@/lib/format";
-import { tableTotals } from "@/features/poker/derive";
+import { seatTotals, tableTotals } from "@/features/poker/derive";
 import type { ShareCardData } from "@/lib/share-card";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +35,43 @@ export function ClosedView({ detail }: { detail: GameDetail }) {
   );
 
   const winner = standings[0];
+  const hasWinner = Boolean(winner && winner.tally.net_result_money > 0);
+
+  // Table superlatives — the fun, shareable "who did what" of the night.
+  const superlatives = useMemo(() => {
+    if (standings.length === 0) return [];
+    const donor = standings[standings.length - 1];
+    const deepest = [...seats]
+      .map((seat) => ({ seat, spent: seatTotals(seat.id, buyIns).money }))
+      .sort((a, b) => b.spent - a.spent)[0];
+    const biggestBuyIn = buyIns.reduce(
+      (max, b) => (b.money_amount > max ? b.money_amount : max),
+      0,
+    );
+
+    const items: { emoji: string; label: string; name: string; value: string; tone?: "bad" }[] = [];
+    if (donor && donor.tally.net_result_money < 0 && donor.seat.id !== winner?.seat.id) {
+      items.push({
+        emoji: "💸",
+        label: "Kept the lights on",
+        name: donor.seat.player.name,
+        value: formatSignedMoney(donor.tally.net_result_money),
+        tone: "bad",
+      });
+    }
+    if (deepest && deepest.spent > 0) {
+      items.push({
+        emoji: "🃏",
+        label: "Deepest pockets",
+        name: deepest.seat.player.name,
+        value: `${formatMoney(deepest.spent)} in`,
+      });
+    }
+    if (biggestBuyIn > 0) {
+      items.push({ emoji: "🔥", label: "Biggest single buy-in", name: "", value: formatMoney(biggestBuyIn) });
+    }
+    return items;
+  }, [standings, seats, buyIns, winner]);
 
   const shareData: ShareCardData = {
     gameName: game.name,
@@ -66,12 +104,14 @@ export function ClosedView({ detail }: { detail: GameDetail }) {
 
   return (
     <div className="space-y-5">
-      {winner && winner.tally.net_result_money > 0 ? (
+      {hasWinner && winner ? (
         <motion.div
+          className="relative"
           initial={reducedMotion ? false : { scale: 0.7, opacity: 0, y: 24 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 260, damping: 18 }}
         >
+          <Confetti fire={hasWinner} />
           <Card className="space-y-2 bg-gold-tint text-center shadow-glow">
             <motion.div
               initial={reducedMotion ? false : { rotate: -12, scale: 0 }}
@@ -121,6 +161,36 @@ export function ClosedView({ detail }: { detail: GameDetail }) {
           </div>
         ))}
       </section>
+
+      {superlatives.length > 0 ? (
+        <section className="space-y-2">
+          <h2 className="font-bold text-white">Table superlatives</h2>
+          <div className="space-y-2">
+            {superlatives.map((item) => (
+              <div
+                key={item.label}
+                className="flex items-center gap-3 rounded-[20px] border border-border bg-elevated p-3"
+              >
+                <span className="text-2xl" aria-hidden="true">
+                  {item.emoji}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted">{item.label}</p>
+                  {item.name ? <p className="truncate font-bold text-white">{item.name}</p> : null}
+                </div>
+                <p
+                  className={cn(
+                    "font-black tabular-nums",
+                    item.tone === "bad" ? "text-red-danger" : "text-gold-brand",
+                  )}
+                >
+                  {item.value}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {error ? (
         <p className="rounded-2xl border border-red-danger/30 bg-red-danger/10 p-3 text-sm text-red-danger">{error}</p>
