@@ -108,7 +108,7 @@ export default async function LandingPage() {
       </nav>
 
       <section className="mx-auto w-full max-w-6xl px-4 pt-6 text-center lg:px-10 lg:pt-12">
-        <h1 className="text-5xl font-black leading-[0.95] text-white lg:text-7xl">
+        <h1 className="text-4xl font-black leading-[1.02] tracking-tight text-white sm:text-5xl lg:text-6xl">
           Host the night.
           <br />
           Settle the chaos.
