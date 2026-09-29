@@ -45,9 +45,21 @@ export default async function ArcadePage() {
       ? `🎭 ${imposterGames} game${imposterGames === 1 ? "" : "s"} played`
       : imposterRooms.length > 0
         ? "Room's open"
-        : "New · pass the phone";
+        : "Pass the phone";
 
   const arcadeGames: ArcadeGame[] = [
+    // Newest game leads the carousel so it starts in the spotlight.
+    {
+      id: "imposter",
+      title: "Imposter",
+      tagline: "One of you has a different word.",
+      href: "/app/imposter",
+      image: "/games/undercover.png",
+      icon: "mask",
+      accent: "violet",
+      status: imposterStatus,
+      badge: "New",
+    },
     {
       id: "poker",
       title: "Poker Night",
@@ -67,16 +79,6 @@ export default async function ArcadePage() {
       icon: "flame",
       accent: "red",
       status: rallyStatus,
-    },
-    {
-      id: "imposter",
-      title: "Imposter",
-      tagline: "One of you has a different word.",
-      href: "/app/imposter",
-      image: "/games/undercover.png",
-      icon: "mask",
-      accent: "violet",
-      status: imposterStatus,
     },
     {
       id: "tambola",
@@ -124,7 +126,7 @@ export default async function ArcadePage() {
       </div>
 
       <p className="mt-4 text-center text-xs text-muted">
-        Hover to pause · Players, history & settings are shared across every game
+        Swipe for more games · Players, history & settings are shared across every game
       </p>
     </div>
   );

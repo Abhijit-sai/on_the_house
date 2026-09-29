@@ -15,6 +15,8 @@ export type ArcadeGame = {
   icon: "spade" | "flame" | "mask" | "ball" | "drama";
   accent: "gold" | "red" | "violet";
   status: string | null;
+  /** Small highlight on the card, e.g. "New". */
+  badge?: string;
 };
 
 const icons: Record<ArcadeGame["icon"], ComponentType<{ className?: string }>> = {
@@ -89,6 +91,12 @@ function GameCard({
       {game.status ? (
         <span className="absolute left-4 top-4 rounded-full border border-border bg-black/70 px-3 py-1 text-[11px] font-bold text-cream backdrop-blur">
           {game.status}
+        </span>
+      ) : null}
+
+      {playable && game.badge ? (
+        <span className={cn("absolute right-4 top-4 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest", accent.chip)}>
+          {game.badge}
         </span>
       ) : null}
 
@@ -288,6 +296,29 @@ export function ArcadeCarousel({ games }: { games: ArcadeGame[] }) {
             )}
           />
         ))}
+      </div>
+
+      {/* The spotlight's call to action — always visible, follows the active card. */}
+      <div className="mx-auto mt-4 w-full max-w-sm px-4">
+        {games[active].href ? (
+          <Link
+            href={games[active].href!}
+            prefetch
+            className={cn(
+              "flex h-14 w-full items-center justify-center gap-2 rounded-2xl text-base font-black transition active:scale-[0.99]",
+              accents[games[active].accent].chip,
+              accents[games[active].accent].glow,
+            )}
+          >
+            Play {games[active].title}
+            <ArrowRight className="h-5 w-5" />
+          </Link>
+        ) : (
+          <div className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl border border-border bg-elevated text-base font-bold text-muted">
+            <Lock className="h-4 w-4" />
+            {games[active].title} is coming soon
+          </div>
+        )}
       </div>
     </section>
   );
