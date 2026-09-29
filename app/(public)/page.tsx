@@ -8,6 +8,17 @@ import { ArcadeCarousel, type ArcadeGame } from "@/features/arcade/arcade-carous
 // Landing-page deck: every playable card sends you to sign-in.
 const games: ArcadeGame[] = [
   {
+    id: "imposter",
+    title: "Imposter",
+    tagline: "One of you has a different word.",
+    href: "/sign-in?redirect_url=%2Fapp%2Fimposter",
+    image: "/games/undercover.png",
+    icon: "mask",
+    accent: "violet",
+    status: "Live",
+    badge: "New",
+  },
+  {
     id: "poker",
     title: "Poker Night",
     tagline: "Chips, buy-ins & a clean settle-up.",
@@ -26,16 +37,6 @@ const games: ArcadeGame[] = [
     icon: "flame",
     accent: "red",
     status: "Live",
-  },
-  {
-    id: "undercover",
-    title: "Undercover",
-    tagline: "One of you has a different word.",
-    href: null,
-    image: "/games/undercover.png",
-    icon: "mask",
-    accent: "red",
-    status: null,
   },
   {
     id: "tambola",
