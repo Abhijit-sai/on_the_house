@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronsUpDown, Flame, Gamepad2, Spade } from "lucide-react";
+import { ChevronsUpDown, Flame, Gamepad2, Spade, VenetianMask } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -32,6 +32,14 @@ const worlds = [
     icon: Flame,
     accent: "text-red-danger",
     matches: (path: string) => path.startsWith("/app/rallies"),
+  },
+  {
+    id: "imposter",
+    href: "/app/imposter",
+    label: "Imposter",
+    icon: VenetianMask,
+    accent: "text-violet-400",
+    matches: (path: string) => path.startsWith("/app/imposter"),
   },
 ];
 

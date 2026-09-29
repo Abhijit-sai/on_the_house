@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { ArcadeCarousel, type ArcadeGame } from "@/features/arcade/arcade-carousel";
 import { getCurrentHost } from "@/features/hosts/queries";
+import { listImposterRoomsForCurrentHost } from "@/features/imposter/queries";
 import { listGamesForCurrentHost } from "@/features/poker/queries";
 import { listRalliesForCurrentHost } from "@/features/rally/queries";
 
@@ -11,7 +12,11 @@ export default async function ArcadePage() {
     redirect("/app/onboarding");
   }
 
-  const [games, rallies] = await Promise.all([listGamesForCurrentHost(), listRalliesForCurrentHost()]);
+  const [games, rallies, imposterRooms] = await Promise.all([
+    listGamesForCurrentHost(),
+    listRalliesForCurrentHost(),
+    listImposterRoomsForCurrentHost(),
+  ]);
 
   const liveGames = games.filter((g) => ["live", "paused", "tally_pending"].includes(g.status)).length;
   const pendingGames = games.filter((g) => g.status === "pending_settlement").length;
@@ -33,6 +38,14 @@ export default async function ArcadePage() {
       : rallies.some((r) => r.status === "completed")
         ? `${rallies.filter((r) => r.status === "completed").length} completed`
         : "Light the first fire";
+
+  const imposterGames = imposterRooms.reduce((sum, r) => sum + r.gamesPlayed, 0);
+  const imposterStatus =
+    imposterGames > 0
+      ? `🎭 ${imposterGames} game${imposterGames === 1 ? "" : "s"} played`
+      : imposterRooms.length > 0
+        ? "Room's open"
+        : "New · pass the phone";
 
   const arcadeGames: ArcadeGame[] = [
     {
@@ -56,14 +69,14 @@ export default async function ArcadePage() {
       status: rallyStatus,
     },
     {
-      id: "undercover",
-      title: "Undercover",
+      id: "imposter",
+      title: "Imposter",
       tagline: "One of you has a different word.",
-      href: null,
+      href: "/app/imposter",
       image: "/games/undercover.png",
       icon: "mask",
-      accent: "red",
-      status: null,
+      accent: "violet",
+      status: imposterStatus,
     },
     {
       id: "tambola",

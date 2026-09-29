@@ -19,6 +19,14 @@ On the House is **live and public at https://games.madsoul.in** with production 
 - Rally proof photos stored full-size (up to 5MB) — add client-side compression before upload.
 - Neel's account: still only on dev, but it holds **no data**, so nothing to migrate unless/until he signs in on production.
 
+## 0b. Imposter (game #3) — built 2026-09-29, NOT yet deployed
+Pass-the-phone Undercover-style word game at `/app/imposter` (hub) → `/app/imposter/new` (pick crew from the shared address book, crown yourself) → `/app/imposter/[roomId]` (lobby: imposter count, word category, pass order, running scoreboard, past games; archive/reopen).
+- **Rules:** everyone draws a face-down card; civilians share a word, imposters get a close cousin and are NOT told their role. Each round: clues from a random starter going round in seat order, then the table votes one out (role revealed, word not). Civilians win when all imposters are out; imposters win by surviving until one civilian is left. Max imposters = ⌊(n−1)/2⌋, 3–20 players.
+- **Scoring:** +1 per vote survived (everyone); surviving imposters on an imposter win get +5, so they always top that game. Constants in `features/imposter/engine.ts`.
+- **Architecture:** live play is client-only (`localStorage` key `oth-imposter-game:<roomId>`, CSPRNG shuffles) so taps are instant and refresh-safe; only finished games are saved. `recordImposterGame` re-validates the whole game and re-scores it with the engine server-side; the game id is minted at the deal so saves are idempotent. Word bank `features/imposter/words.ts` (~180 pairs, 12 categories, no repeat within a room until exhausted). Sounds synthesized with Web Audio in `features/imposter/sounds.ts` (distinct peek alarm + red screen flash; mute persisted). 24 engine tests.
+- **Migration `db/migrations/202609290005_imposter_module.sql` must be applied in the Supabase SQL editor before deploying.** Queries tolerate the tables missing (arcade/history/pickers keep working), but rooms can't be created until it's applied.
+- Arcade "Undercover" teaser is now the playable Imposter card (violet world accent); GameSwitcher, sidebar CTA, History and picker play-counts include it.
+
 ## 1. Current Project State (build history — superseded by §0)
 The repo contains a working Next.js App Router app for On the House with all WBS phases 0–8 implemented (minus live-database verification): the complete host Poker Night flow, public read-only player view at `/g/[token]`, UPI conveniences (deep link, QR, copy, add-UPI-during-settlement), and shareable 1080×1920 canvas result cards. Phase 9 is partially done (theme, avatars, motion; no 3D/physics). The settlement engine has a 22-test vitest suite covering all required cases from docs/06.
 

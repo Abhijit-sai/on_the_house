@@ -59,10 +59,11 @@ export async function listPlayersByPlayCount() {
   const host = await requireCurrentHost();
   const supabase = createSupabaseAdminClient();
 
-  const [playersRes, gamesRes, ralliesRes] = await Promise.all([
+  const [playersRes, gamesRes, ralliesRes, roomsRes] = await Promise.all([
     supabase.from("players").select("*").eq("host_id", host.id),
     supabase.from("games").select("id").eq("host_id", host.id),
     supabase.from("rallies").select("id").eq("host_id", host.id),
+    supabase.from("imposter_rooms").select("id").eq("host_id", host.id),
   ]);
 
   if (playersRes.error) throw new Error(playersRes.error.message);
@@ -84,9 +85,17 @@ export async function listPlayersByPlayCount() {
   if (seatsRes.error) throw new Error(seatsRes.error.message);
   if (membersRes.error) throw new Error(membersRes.error.message);
 
+  // Imposter seats count too — but only once its tables exist, so a missing
+  // migration never breaks the pickers.
+  const roomIds = roomsRes.error ? [] : roomsRes.data.map((r) => r.id);
+  const imposterSeats =
+    roomIds.length > 0
+      ? ((await supabase.from("imposter_room_players").select("player_id").in("room_id", roomIds)).data ?? [])
+      : [];
+
   const counts = new Map<string, number>();
 
-  for (const row of [...(seatsRes.data ?? []), ...(membersRes.data ?? [])]) {
+  for (const row of [...(seatsRes.data ?? []), ...(membersRes.data ?? []), ...imposterSeats]) {
     counts.set(row.player_id, (counts.get(row.player_id) ?? 0) + 1);
   }
 

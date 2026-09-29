@@ -202,6 +202,60 @@ export type RallyJoinRequest = {
   updated_at: string;
 };
 
+export type ImposterRoomStatus = "active" | "archived";
+
+export type ImposterRole = "civilian" | "imposter";
+
+export type ImposterWinner = "civilians" | "imposters";
+
+export type ImposterRoom = {
+  id: string;
+  host_id: string;
+  title: string;
+  status: ImposterRoomStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ImposterRoomPlayer = {
+  id: string;
+  room_id: string;
+  player_id: string;
+  seat_order: number;
+  is_host_player: boolean;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ImposterGame = {
+  id: string;
+  room_id: string;
+  category_id: string;
+  civilian_word: string;
+  imposter_word: string;
+  imposter_count: number;
+  rounds_played: number;
+  winner: ImposterWinner;
+  started_at: string;
+  finished_at: string;
+  created_at: string;
+};
+
+export type ImposterGameScore = {
+  id: string;
+  game_id: string;
+  room_player_id: string;
+  role: ImposterRole;
+  word: string;
+  eliminated_round: number | null;
+  rounds_survived: number;
+  bonus: number;
+  points: number;
+  peeks: number;
+  created_at: string;
+};
+
 export type GameEvent = {
   id: string;
   game_id: string;
@@ -471,6 +525,76 @@ export type Database = {
           },
         ];
       };
+      imposter_rooms: {
+        Row: ImposterRoom;
+        Insert: Insertable<ImposterRoom, "status">;
+        Update: Partial<Omit<ImposterRoom, "id" | "host_id" | "created_at">>;
+        Relationships: [
+          {
+            foreignKeyName: "imposter_rooms_host_id_fkey";
+            columns: ["host_id"];
+            isOneToOne: false;
+            referencedRelation: "hosts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      imposter_room_players: {
+        Row: ImposterRoomPlayer;
+        Insert: Insertable<ImposterRoomPlayer, "is_host_player" | "active">;
+        Update: Partial<Omit<ImposterRoomPlayer, "id" | "room_id" | "player_id" | "created_at">>;
+        Relationships: [
+          {
+            foreignKeyName: "imposter_room_players_room_id_fkey";
+            columns: ["room_id"];
+            isOneToOne: false;
+            referencedRelation: "imposter_rooms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "imposter_room_players_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      imposter_games: {
+        Row: ImposterGame;
+        Insert: Omit<ImposterGame, "created_at" | "finished_at"> & { created_at?: string; finished_at?: string };
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "imposter_games_room_id_fkey";
+            columns: ["room_id"];
+            isOneToOne: false;
+            referencedRelation: "imposter_rooms";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      imposter_game_scores: {
+        Row: ImposterGameScore;
+        Insert: Insertable<ImposterGameScore, "bonus" | "peeks">;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "imposter_game_scores_game_id_fkey";
+            columns: ["game_id"];
+            isOneToOne: false;
+            referencedRelation: "imposter_games";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "imposter_game_scores_room_player_id_fkey";
+            columns: ["room_player_id"];
+            isOneToOne: false;
+            referencedRelation: "imposter_room_players";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       game_events: {
         Row: GameEvent;
         Insert: Omit<GameEvent, "id" | "created_at"> & { id?: string; created_at?: string; event_payload?: Json | null };
@@ -497,6 +621,9 @@ export type Database = {
       rally_status: RallyStatus;
       rally_check_in_status: RallyCheckInStatus;
       rally_join_request_status: RallyJoinRequestStatus;
+      imposter_room_status: ImposterRoomStatus;
+      imposter_role: ImposterRole;
+      imposter_winner: ImposterWinner;
     };
     CompositeTypes: Record<string, never>;
   };

@@ -18,6 +18,14 @@ function worldCta(pathname: string) {
     return { href: "/app/rallies/new", label: "Start a rally", className: "bg-red-brand text-white shadow-red-glow" };
   }
 
+  if (pathname.startsWith("/app/imposter")) {
+    return {
+      href: "/app/imposter/new",
+      label: "Open a room",
+      className: "bg-violet-500 text-white shadow-[0_0_28px_rgba(139,92,246,0.35)]",
+    };
+  }
+
   if (pathname.startsWith("/app/dashboard") || pathname.startsWith("/app/games")) {
     return { href: "/app/games/new/poker", label: "New game night", className: "bg-gold-brand text-background shadow-glow" };
   }

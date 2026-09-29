@@ -112,12 +112,64 @@ select {
   animation: ambient-drift 14s ease-in-out infinite;
 }
 
+/* Imposter: a card turning face-up. */
+@keyframes card-flip {
+  0% {
+    transform: perspective(900px) rotateY(90deg) scale(0.9);
+    opacity: 0.2;
+  }
+  60% {
+    transform: perspective(900px) rotateY(-8deg) scale(1.02);
+    opacity: 1;
+  }
+  100% {
+    transform: perspective(900px) rotateY(0deg) scale(1);
+  }
+}
+
+.card-flip {
+  animation: card-flip 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Imposter: the whole screen flashes when someone re-reads their card. */
+@keyframes peek-alarm {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 0 rgba(255, 77, 90, 0);
+  }
+  50% {
+    box-shadow: inset 0 0 0 6px rgba(255, 77, 90, 0.8);
+  }
+}
+
+.peek-alarm {
+  animation: peek-alarm 0.5s ease-in-out 3;
+}
+
+@keyframes card-deal {
+  from {
+    transform: translateY(-24px) rotate(-6deg);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) rotate(0);
+    opacity: 1;
+  }
+}
+
+.card-deal {
+  animation: card-deal 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sheet-up,
   .live-pulse,
   .chip-pop,
   .arcade-progress,
-  .ambient-drift {
+  .ambient-drift,
+  .card-flip,
+  .peek-alarm,
+  .card-deal {
     animation: none;
   }
 }

@@ -13,7 +13,7 @@ export type ArcadeGame = {
   href: string | null; // null = coming soon
   image: string;
   icon: "spade" | "flame" | "mask" | "ball" | "drama";
-  accent: "gold" | "red";
+  accent: "gold" | "red" | "violet";
   status: string | null;
 };
 
@@ -28,6 +28,7 @@ const icons: Record<ArcadeGame["icon"], ComponentType<{ className?: string }>> =
 const accents = {
   gold: { text: "text-gold-brand", chip: "bg-gold-brand text-background", glow: "shadow-[0_0_60px_rgba(245,185,66,0.35)]" },
   red: { text: "text-red-danger", chip: "bg-red-brand text-white", glow: "shadow-[0_0_60px_rgba(215,38,56,0.4)]" },
+  violet: { text: "text-violet-300", chip: "bg-violet-500 text-white", glow: "shadow-[0_0_60px_rgba(139,92,246,0.45)]" },
 };
 
 /** How long each card holds the spotlight before the carousel moves on. */
