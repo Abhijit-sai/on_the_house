@@ -161,6 +161,221 @@ select {
   animation: card-deal 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Mafia: fog rolling across the table. */
+@keyframes mafia-fog {
+  0%,
+  100% {
+    transform: translateX(-12%) scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translateX(12%) scale(1.2);
+    opacity: 0.9;
+  }
+}
+
+.mafia-fog {
+  animation: mafia-fog 18s ease-in-out infinite;
+}
+
+/* Mafia: the moon climbing as night falls. */
+@keyframes moon-rise {
+  from {
+    transform: translateY(48px) scale(0.85);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.moon-rise {
+  animation: moon-rise 1.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+.twinkle {
+  animation: twinkle 3.2s ease-in-out infinite;
+}
+
+/* Mafia: dawn light swelling up from the horizon. */
+@keyframes sun-rise {
+  from {
+    transform: translateY(55%) scale(0.7);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.sun-rise {
+  animation: sun-rise 1.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Mafia: a rubber stamp slammed onto a card (KILLED, SAVED, VOTED OUT). */
+@keyframes stamp {
+  0% {
+    transform: scale(2.4) rotate(-18deg);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(0.92) rotate(-7deg);
+    opacity: 1;
+  }
+  75% {
+    transform: scale(1.04) rotate(-9deg);
+  }
+  100% {
+    transform: scale(1) rotate(-8deg);
+    opacity: 1;
+  }
+}
+
+.stamp {
+  animation: stamp 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+/* Mafia: the screen jolts on a gunshot. */
+@keyframes shake {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  15% {
+    transform: translate(-7px, 3px);
+  }
+  30% {
+    transform: translate(6px, -4px);
+  }
+  45% {
+    transform: translate(-4px, 2px);
+  }
+  60% {
+    transform: translate(3px, -1px);
+  }
+  80% {
+    transform: translate(-1px, 1px);
+  }
+}
+
+.shake {
+  animation: shake 0.45s ease-out;
+}
+
+/* Mafia: each step of God's script slides in from the right. */
+@keyframes slide-in {
+  from {
+    transform: translateX(28px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.slide-in {
+  animation: slide-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Rises into place — staggered with animation-delay for lists. */
+@keyframes fade-up {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.fade-up {
+  animation: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Mafia: an eye opening on "open your eyes". */
+@keyframes eye-open {
+  0% {
+    transform: scaleY(0.08);
+  }
+  60% {
+    transform: scaleY(1.08);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+
+.eye-open {
+  animation: eye-open 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+}
+
+/* Mafia: a target lock — the ring breathes around the picked player. */
+@keyframes lock-on {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 0.7;
+  }
+}
+
+.lock-on {
+  animation: lock-on 1.2s ease-in-out infinite;
+}
+
+/* Mafia: the day timer's heartbeat in the last ten seconds. */
+@keyframes heartbeat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  15% {
+    transform: scale(1.06);
+  }
+  30% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.04);
+  }
+}
+
+.heartbeat {
+  animation: heartbeat 1s ease-in-out infinite;
+}
+
+/* Mafia: blood-red vignette pulsing when the family wins. */
+@keyframes vignette {
+  0%,
+  100% {
+    box-shadow: inset 0 0 80px 10px rgba(215, 38, 56, 0.25);
+  }
+  50% {
+    box-shadow: inset 0 0 140px 30px rgba(215, 38, 56, 0.5);
+  }
+}
+
+.vignette {
+  animation: vignette 2.4s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sheet-up,
   .live-pulse,
@@ -169,7 +384,19 @@ select {
   .ambient-drift,
   .card-flip,
   .peek-alarm,
-  .card-deal {
+  .card-deal,
+  .mafia-fog,
+  .moon-rise,
+  .twinkle,
+  .sun-rise,
+  .stamp,
+  .shake,
+  .slide-in,
+  .fade-up,
+  .eye-open,
+  .lock-on,
+  .heartbeat,
+  .vignette {
     animation: none;
   }
 }

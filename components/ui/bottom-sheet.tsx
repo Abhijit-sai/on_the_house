@@ -1,8 +1,41 @@
 "use client";
 
 import { X } from "lucide-react";
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+
+/**
+ * The part of the screen the keyboard isn't covering. Mobile browsers open the
+ * keyboard over the page without resizing it, so a sheet pinned to the bottom
+ * ends up underneath it. While the keyboard is up, the sheet sizes itself to
+ * the visible area instead — search field, suggestions and the Save button all
+ * stay above the keys.
+ */
+function useVisibleViewport(active: boolean) {
+  const [viewport, setViewport] = useState<{ top: number; height: number } | null>(null);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!active || !vv) return;
+
+    const update = () => {
+      const keyboardUp = window.innerHeight - vv.height > 80;
+      setViewport(keyboardUp ? { top: vv.offsetTop, height: vv.height } : null);
+    };
+
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+      setViewport(null);
+    };
+  }, [active]);
+
+  return viewport;
+}
 
 export function BottomSheet({
   open,
@@ -17,6 +50,8 @@ export function BottomSheet({
   children: ReactNode;
   className?: string;
 }) {
+  const viewport = useVisibleViewport(open);
+
   useEffect(() => {
     if (!open) return;
 
@@ -36,7 +71,10 @@ export function BottomSheet({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 mx-auto flex max-w-md flex-col justify-end">
+    <div
+      className="fixed inset-x-0 z-50 mx-auto flex max-w-md flex-col justify-end"
+      style={viewport ? { top: viewport.top, height: viewport.height } : { top: 0, bottom: 0 }}
+    >
       <button
         type="button"
         aria-label="Close"
@@ -46,8 +84,9 @@ export function BottomSheet({
       <div
         role="dialog"
         aria-modal="true"
+        style={viewport ? { maxHeight: viewport.height - 8 } : undefined}
         className={cn(
-          "sheet-up relative max-h-[85dvh] overflow-y-auto rounded-t-[28px] border border-b-0 border-border bg-surface px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3",
+          "sheet-up relative max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-[28px] border border-b-0 border-border bg-surface px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3",
           className,
         )}
       >

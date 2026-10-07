@@ -8,6 +8,17 @@ import { ArcadeCarousel, type ArcadeGame } from "@/features/arcade/arcade-carous
 // Landing-page deck: every playable card sends you to sign-in.
 const games: ArcadeGame[] = [
   {
+    id: "mafia",
+    title: "Mafia",
+    tagline: "The town sleeps. The mafia doesn't.",
+    href: "/sign-in?redirect_url=%2Fapp%2Fmafia",
+    image: "/games/mafia.png",
+    icon: "drama",
+    accent: "red",
+    status: "Live",
+    badge: "New",
+  },
+  {
     id: "imposter",
     title: "Imposter",
     tagline: "One of you has a different word.",
@@ -16,7 +27,6 @@ const games: ArcadeGame[] = [
     icon: "mask",
     accent: "violet",
     status: "Live",
-    badge: "New",
   },
   {
     id: "poker",
@@ -46,16 +56,6 @@ const games: ArcadeGame[] = [
     image: "/games/tambola.png",
     icon: "ball",
     accent: "gold",
-    status: null,
-  },
-  {
-    id: "mafia",
-    title: "Mafia",
-    tagline: "The town sleeps. The mafia doesn't.",
-    href: null,
-    image: "/games/mafia.png",
-    icon: "drama",
-    accent: "red",
     status: null,
   },
 ];

@@ -109,34 +109,37 @@ function PickerSheetBody({
     <BottomSheet open onClose={onClose} title={title} className="pb-0">
       <div className="space-y-3">
         {description ? <p className="text-sm text-muted">{description}</p> : null}
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-          <Input
-            aria-label="Search players or type a new name"
-            placeholder={onCreatePlayer ? "Search, or type a new name" : "Search players"}
-            className="pl-10"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && q && !exactMatch) {
-                e.preventDefault();
-                addNew();
-              }
-            }}
-          />
-        </div>
+        {/* the search stays pinned while the list scrolls, so it's never pushed under the keyboard */}
+        <div className="sticky top-0 z-10 -mx-4 space-y-3 bg-surface px-4 pb-1 pt-1">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+            <Input
+              aria-label="Search players or type a new name"
+              placeholder={onCreatePlayer ? "Search, or type a new name" : "Search players"}
+              className="pl-10"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && q && !exactMatch) {
+                  e.preventDefault();
+                  addNew();
+                }
+              }}
+            />
+          </div>
 
-        {onCreatePlayer && q && !exactMatch ? (
-          <button
-            type="button"
-            disabled={adding}
-            onClick={addNew}
-            className="flex min-h-12 w-full items-center gap-3 rounded-2xl border border-dashed border-gold-brand/50 bg-gold-tint px-3 text-left text-sm font-bold text-gold-brand disabled:opacity-60"
-          >
-            {adding ? <Loader2 className="h-5 w-5 animate-spin" /> : <UserPlus className="h-5 w-5" />}
-            <span className="min-w-0 flex-1 truncate">Add &ldquo;{query.trim()}&rdquo; as a new player</span>
-          </button>
-        ) : null}
+          {onCreatePlayer && q && !exactMatch ? (
+            <button
+              type="button"
+              disabled={adding}
+              onClick={addNew}
+              className="flex min-h-12 w-full items-center gap-3 rounded-2xl border border-dashed border-gold-brand/50 bg-gold-tint px-3 text-left text-sm font-bold text-gold-brand disabled:opacity-60"
+            >
+              {adding ? <Loader2 className="h-5 w-5 animate-spin" /> : <UserPlus className="h-5 w-5" />}
+              <span className="min-w-0 flex-1 truncate">Add &ldquo;{query.trim()}&rdquo; as a new player</span>
+            </button>
+          ) : null}
+        </div>
 
         {error ? <p className="text-sm text-red-danger">{error}</p> : null}
 

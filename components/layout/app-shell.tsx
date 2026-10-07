@@ -1,6 +1,6 @@
 import { UserButton } from "@clerk/nextjs";
 import { ReactNode } from "react";
-import { GameSwitcher } from "@/components/layout/game-switcher";
+import { GameDock, SidebarGames } from "@/components/layout/game-dock";
 import { KeyboardAware } from "@/components/layout/keyboard-aware";
 import { BottomWorldNav, SidebarWorldCta, SidebarWorldNav } from "@/components/layout/world-nav";
 import { getCurrentHost } from "@/features/hosts/queries";
@@ -17,10 +17,10 @@ export async function AppShell({ children }: { children: ReactNode }) {
           <p className="text-sm font-black uppercase tracking-[0.2em] text-gold-brand">On the House</p>
           <p className="mt-1 text-xs text-muted">{host?.display_name ?? "Game night host"}</p>
         </div>
-        <div className="mb-4 px-3">
-          <GameSwitcher />
-        </div>
         <SidebarWorldCta />
+        <div className="mb-4">
+          <SidebarGames />
+        </div>
         <SidebarWorldNav />
         <div className="mt-auto px-3">
           <UserButton />
@@ -30,13 +30,10 @@ export async function AppShell({ children }: { children: ReactNode }) {
       <div className="flex min-h-dvh flex-1 flex-col lg:max-w-3xl">
         {/* Mobile header */}
         <header className="sticky top-0 z-20 border-b border-border bg-background/90 px-4 py-3 backdrop-blur lg:hidden">
+          {/* every game one tap away; the account sits on the right */}
           <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-xs uppercase tracking-[0.2em] text-gold-brand">On the House</p>
-              <p className="truncate text-sm text-muted">{host?.display_name ?? "Game night host"}</p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <GameSwitcher />
+            <GameDock />
+            <div className="flex shrink-0 items-center">
               <UserButton />
             </div>
           </div>

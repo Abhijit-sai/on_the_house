@@ -1,0 +1,163 @@
+"use client";
+
+import { Crown, Drama, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
+import type { Player } from "@/db/types/database";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { PlayerAvatar } from "@/components/shared/player-avatar";
+import { PlayerPicker, type CreatePlayerResult, type PickerPlayer } from "@/components/shared/player-picker";
+import { savePlayer } from "@/features/players/actions";
+import { createMafiaRoom } from "@/features/mafia/actions";
+import { MAX_CREW, MIN_CREW } from "@/features/mafia/engine";
+import { cn } from "@/lib/utils";
+
+export function NewMafiaRoomForm({ players, hostName }: { players: Player[]; hostName?: string }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const [title, setTitle] = useState("");
+  const [memberIds, setMemberIds] = useState<string[]>([]);
+  const [hostPlayerId, setHostPlayerId] = useState<string | null>(null);
+  const [extraPlayers, setExtraPlayers] = useState<PickerPlayer[]>([]);
+
+  const allPlayers = useMemo(() => {
+    const known = new Set(players.map((p) => p.id));
+    return [...extraPlayers.filter((p) => !known.has(p.id)), ...players];
+  }, [players, extraPlayers]);
+
+  const playersById = useMemo(() => new Map(allPlayers.map((p) => [p.id, p])), [allPlayers]);
+
+  /** Apply the picker's selection; auto-crown whoever carries the host's name. */
+  function setMembers(ids: string[]) {
+    setError(null);
+    const next = ids.slice(0, MAX_CREW);
+    setMemberIds(next);
+
+    setHostPlayerId((current) => {
+      if (current && next.includes(current)) return current;
+      if (!hostName) return null;
+
+      const me = next.find((id) => playersById.get(id)?.name.trim().toLowerCase() === hostName.trim().toLowerCase());
+
+      return me ?? null;
+    });
+  }
+
+  async function createPlayer(playerName: string): Promise<CreatePlayerResult> {
+    const result = await savePlayer({ name: playerName });
+
+    if (result.ok && result.player) {
+      const created = result.player;
+      setExtraPlayers((current) => [created, ...current]);
+      router.refresh();
+    }
+
+    return result;
+  }
+
+  function create() {
+    startTransition(async () => {
+      const result = await createMafiaRoom({
+        title: title.trim() || undefined,
+        members: memberIds.map((playerId) => ({ playerId, isHostPlayer: playerId === hostPlayerId })),
+      });
+
+      if (!result.ok || !result.roomId) {
+        setError(result.message ?? "Could not set up the room.");
+        return;
+      }
+
+      router.push(`/app/mafia/${result.roomId}`);
+    });
+  }
+
+  const short = memberIds.length < MIN_CREW;
+
+  return (
+    <div className="space-y-4">
+      <Card className="space-y-2">
+        <Label htmlFor="mafia-title">Name the room (optional)</Label>
+        <Input
+          id="mafia-title"
+          placeholder="Saturday at Rahil's"
+          value={title}
+          maxLength={60}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+      </Card>
+
+      <Card className="space-y-3">
+        <PlayerPicker
+          label="Who's in the crew?"
+          players={allPlayers}
+          selectedIds={memberIds}
+          onChange={setMembers}
+          onCreatePlayer={createPlayer}
+          max={MAX_CREW}
+        />
+
+        {memberIds.length > 0 ? (
+          <div className="space-y-2">
+            <p className="text-[11px] text-muted">
+              Everyone, God included — you pick God before each game. Add people the way you&apos;re sitting.{" "}
+              <Crown className="mb-0.5 mr-0.5 inline h-3 w-3" /> marks you.
+            </p>
+            <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-elevated">
+              {memberIds.map((playerId, index) => {
+                const player = playersById.get(playerId);
+
+                if (!player) return null;
+
+                return (
+                  <div key={playerId} className="flex min-h-12 items-center gap-3 px-3 py-1.5">
+                    <span className="w-5 text-center text-xs font-black tabular-nums text-muted">{index + 1}</span>
+                    <PlayerAvatar name={player.name} colorKey={player.color_key} size="sm" />
+                    <span className="min-w-0 flex-1 truncate text-sm font-bold text-white">{player.name}</span>
+                    <button
+                      type="button"
+                      aria-label={hostPlayerId === playerId ? "Unmark as you" : "Mark as you"}
+                      aria-pressed={hostPlayerId === playerId}
+                      onClick={() => setHostPlayerId((current) => (current === playerId ? null : playerId))}
+                      className={cn(
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border",
+                        hostPlayerId === playerId
+                          ? "border-gold-brand bg-gold-tint text-gold-brand"
+                          : "border-border text-muted",
+                      )}
+                    >
+                      <Crown className="h-4 w-4" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+      </Card>
+
+      {error ? (
+        <p className="rounded-2xl border border-red-danger/30 bg-red-danger/10 p-3 text-sm text-red-danger">{error}</p>
+      ) : null}
+
+      {memberIds.length >= MIN_CREW && !hostPlayerId ? (
+        <p className="rounded-2xl border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
+          No seat is marked as you. Crown yourself above if you&apos;re playing too, so your points show up as yours.
+        </p>
+      ) : null}
+
+      <Button
+        className="h-14 w-full bg-red-brand text-base text-white shadow-red-glow hover:bg-red-brand/90"
+        disabled={isPending || short}
+        onClick={create}
+      >
+        {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Drama className="h-5 w-5" />}
+        {short ? `Pick at least ${MIN_CREW} people (players + God)` : "Open the room"}
+      </Button>
+    </div>
+  );
+}

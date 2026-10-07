@@ -256,6 +256,67 @@ export type ImposterGameScore = {
   created_at: string;
 };
 
+export type MafiaRoomStatus = "active" | "archived";
+
+export type MafiaRole = "mafia" | "doctor" | "detective" | "villager";
+
+export type MafiaWinner = "town" | "mafia";
+
+export type MafiaRoom = {
+  id: string;
+  host_id: string;
+  title: string;
+  status: MafiaRoomStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MafiaRoomPlayer = {
+  id: string;
+  room_id: string;
+  player_id: string;
+  seat_order: number;
+  is_host_player: boolean;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MafiaGame = {
+  id: string;
+  room_id: string;
+  god_room_player_id: string;
+  mafia_count: number;
+  has_doctor: boolean;
+  has_detective: boolean;
+  reveal_on_death: boolean;
+  nights_played: number;
+  days_played: number;
+  winner: MafiaWinner;
+  events: Json;
+  started_at: string;
+  finished_at: string;
+  created_at: string;
+};
+
+export type MafiaGameScore = {
+  id: string;
+  game_id: string;
+  room_player_id: string;
+  role: MafiaRole;
+  won: boolean;
+  died_night: number | null;
+  voted_out_day: number | null;
+  left_game: boolean;
+  survived: number;
+  bonus: number;
+  saves: number;
+  finds: number;
+  peeks: number;
+  points: number;
+  created_at: string;
+};
+
 export type GameEvent = {
   id: string;
   game_id: string;
@@ -595,6 +656,83 @@ export type Database = {
           },
         ];
       };
+      mafia_rooms: {
+        Row: MafiaRoom;
+        Insert: Insertable<MafiaRoom, "status">;
+        Update: Partial<Omit<MafiaRoom, "id" | "host_id" | "created_at">>;
+        Relationships: [
+          {
+            foreignKeyName: "mafia_rooms_host_id_fkey";
+            columns: ["host_id"];
+            isOneToOne: false;
+            referencedRelation: "hosts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      mafia_room_players: {
+        Row: MafiaRoomPlayer;
+        Insert: Insertable<MafiaRoomPlayer, "is_host_player" | "active">;
+        Update: Partial<Omit<MafiaRoomPlayer, "id" | "room_id" | "player_id" | "created_at">>;
+        Relationships: [
+          {
+            foreignKeyName: "mafia_room_players_room_id_fkey";
+            columns: ["room_id"];
+            isOneToOne: false;
+            referencedRelation: "mafia_rooms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "mafia_room_players_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      mafia_games: {
+        Row: MafiaGame;
+        Insert: Omit<MafiaGame, "created_at" | "finished_at"> & { created_at?: string; finished_at?: string };
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "mafia_games_room_id_fkey";
+            columns: ["room_id"];
+            isOneToOne: false;
+            referencedRelation: "mafia_rooms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "mafia_games_god_room_player_id_fkey";
+            columns: ["god_room_player_id"];
+            isOneToOne: false;
+            referencedRelation: "mafia_room_players";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      mafia_game_scores: {
+        Row: MafiaGameScore;
+        Insert: Insertable<MafiaGameScore, "bonus" | "saves" | "finds" | "peeks" | "left_game">;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "mafia_game_scores_game_id_fkey";
+            columns: ["game_id"];
+            isOneToOne: false;
+            referencedRelation: "mafia_games";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "mafia_game_scores_room_player_id_fkey";
+            columns: ["room_player_id"];
+            isOneToOne: false;
+            referencedRelation: "mafia_room_players";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       game_events: {
         Row: GameEvent;
         Insert: Omit<GameEvent, "id" | "created_at"> & { id?: string; created_at?: string; event_payload?: Json | null };
@@ -624,6 +762,9 @@ export type Database = {
       imposter_room_status: ImposterRoomStatus;
       imposter_role: ImposterRole;
       imposter_winner: ImposterWinner;
+      mafia_room_status: MafiaRoomStatus;
+      mafia_role: MafiaRole;
+      mafia_winner: MafiaWinner;
     };
     CompositeTypes: Record<string, never>;
   };

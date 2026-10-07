@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { ArcadeCarousel, type ArcadeGame } from "@/features/arcade/arcade-carousel";
 import { getCurrentHost } from "@/features/hosts/queries";
 import { listImposterRoomsForCurrentHost } from "@/features/imposter/queries";
+import { listMafiaRoomsForCurrentHost } from "@/features/mafia/queries";
 import { listGamesForCurrentHost } from "@/features/poker/queries";
 import { listRalliesForCurrentHost } from "@/features/rally/queries";
 
@@ -12,10 +13,11 @@ export default async function ArcadePage() {
     redirect("/app/onboarding");
   }
 
-  const [games, rallies, imposterRooms] = await Promise.all([
+  const [games, rallies, imposterRooms, mafiaRooms] = await Promise.all([
     listGamesForCurrentHost(),
     listRalliesForCurrentHost(),
     listImposterRoomsForCurrentHost(),
+    listMafiaRoomsForCurrentHost(),
   ]);
 
   const liveGames = games.filter((g) => ["live", "paused", "tally_pending"].includes(g.status)).length;
@@ -47,8 +49,27 @@ export default async function ArcadePage() {
         ? "Room's open"
         : "Pass the phone";
 
+  const mafiaGames = mafiaRooms.reduce((sum, r) => sum + r.gamesPlayed, 0);
+  const mafiaStatus =
+    mafiaGames > 0
+      ? `🔪 ${mafiaGames} game${mafiaGames === 1 ? "" : "s"} played`
+      : mafiaRooms.length > 0
+        ? "Room's open"
+        : "Play God tonight";
+
   const arcadeGames: ArcadeGame[] = [
     // Newest game leads the carousel so it starts in the spotlight.
+    {
+      id: "mafia",
+      title: "Mafia",
+      tagline: "The town sleeps. The mafia doesn't.",
+      href: "/app/mafia",
+      image: "/games/mafia.png",
+      icon: "drama",
+      accent: "red",
+      status: mafiaStatus,
+      badge: "New",
+    },
     {
       id: "imposter",
       title: "Imposter",
@@ -58,7 +79,6 @@ export default async function ArcadePage() {
       icon: "mask",
       accent: "violet",
       status: imposterStatus,
-      badge: "New",
     },
     {
       id: "poker",
@@ -88,16 +108,6 @@ export default async function ArcadePage() {
       image: "/games/tambola.png",
       icon: "ball",
       accent: "gold",
-      status: null,
-    },
-    {
-      id: "mafia",
-      title: "Mafia",
-      tagline: "The town sleeps. The mafia doesn't.",
-      href: null,
-      image: "/games/mafia.png",
-      icon: "drama",
-      accent: "red",
       status: null,
     },
   ];
